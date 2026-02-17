@@ -5,8 +5,8 @@ import Navbar from "./Navbar";
 const BOOT_LINES = [
   "> INITIALIZING PCB-INSPECT AI...",
   "> LOADING NEURAL WEIGHTS [████████] 100%",
-  "> RESNET-48 BACKBONE READY",
-  "> DEFECT CLASSIFIER ONLINE",
+  "> YOLOV8M BACKBONE READY",
+  "> DEFECT CLASSIFIER ONLINE — 6 CLASSES",
   "> ALL SYSTEMS OPERATIONAL ✓",
 ];
 
@@ -44,7 +44,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!statsVisible) return;
-    const targets = { c1: 98.6, c2: 2, c3: 12 };
+    // ✅ REAL model stats: 93.6% mAP, ~14ms inference, 6 defect classes
+    const targets = { c1: 93.6, c2: 14, c3: 6 };
     const ids = Object.keys(targets).map(key => {
       let cur = 0; const step = targets[key] / 55;
       return setInterval(() => {
@@ -123,7 +124,7 @@ export default function Home() {
         const yf = j / 8, y = vy + (H - vy) * yf * yf;
         const xl = vx - W * 0.6 * (1 - yf), xr = vx + W * 0.6 * (1 - yf);
         const g = ctx.createLinearGradient(xl, y, xr, y);
-        g.addColorStop(0, "rgba(0,255,120,0)"); g.addColorStop(0.5, `rgba(0,255,120,${(1-yf)*0.15})`); g.addColorStop(1, "rgba(0,255,120,0)");
+        g.addColorStop(0, "rgba(0,255,120,0)"); g.addColorStop(0.5, `rgba(0,255,120,${(1 - yf) * 0.15})`); g.addColorStop(1, "rgba(0,255,120,0)");
         ctx.beginPath(); ctx.moveTo(xl, y); ctx.lineTo(xr, y); ctx.strokeStyle = g; ctx.lineWidth = 0.7; ctx.stroke();
       }
       traces.forEach(tr => {
@@ -185,7 +186,7 @@ export default function Home() {
               <span className="hm-term-dot" style={{ background: "#ff5f57" }} />
               <span className="hm-term-dot" style={{ background: "#febc2e" }} />
               <span className="hm-term-dot" style={{ background: "#28c840" }} />
-              <span className="hm-term-title">PCB-INSPECT-AI</span>
+              <span className="hm-term-title">PCB-INSPECT-AI v2.4.0</span>
             </div>
             <div className="hm-term-body">
               {bootLines.filter(Boolean).map((line, i) => (
@@ -205,7 +206,8 @@ export default function Home() {
             <span className="hm-badge-dot" />
             <span className="hm-badge-txt">AI-POWERED INSPECTION</span>
             <span className="hm-badge-sep" />
-            <span className="hm-badge-txt" style={{ color: "#00c8ff" }}>v2.4.0</span>
+            {/* ✅ Updated model name */}
+            <span className="hm-badge-txt" style={{ color: "#00c8ff" }}>YOLOv8m</span>
           </div>
 
           <div className="hm-title-block">
@@ -226,15 +228,16 @@ export default function Home() {
           </div>
 
           <p className="hm-tagline">
-            Industrial-grade PCB defect detection powered by deep learning.<br className="hm-br-desktop" />
+            Industrial-grade PCB defect detection powered by YOLOv8m deep learning.<br className="hm-br-desktop" />
             Upload. Analyze. Decide — in under 2 seconds.
           </p>
 
+          {/* ✅ Real stats: mAP 93.6%, 14ms inference, 6 defect classes */}
           <div className="hm-stats" style={{ opacity: statsVisible ? 1 : 0, transform: statsVisible ? "translateY(0)" : "translateY(12px)", transition: "all 0.8s ease 0.2s" }}>
             {[
-              { val: counts.c1 > 0 ? `${counts.c1}%` : "—", label: "Accuracy", sub: "On benchmark dataset", icon: "◉" },
-              { val: counts.c2 > 0 ? `<${counts.c2}s` : "—", label: "Scan Speed", sub: "Per board image", icon: "◈" },
-              { val: counts.c3 > 0 ? `${counts.c3}+` : "—", label: "Defect Types", sub: "Auto classified", icon: "◆" },
+              { val: counts.c1 > 0 ? `${counts.c1}%` : "—", label: "mAP@0.5", sub: "YOLOv8m on test set", icon: "◉" },
+              { val: counts.c2 > 0 ? `${counts.c2}ms` : "—", label: "Inference Speed", sub: "Per image on GPU", icon: "◈" },
+              { val: counts.c3 > 0 ? `${counts.c3}` : "—", label: "Defect Classes", sub: "Auto classified", icon: "◆" },
             ].map((s, i) => (
               <div key={i} className="hm-stat-card">
                 <div className="hm-stat-top">
@@ -247,6 +250,25 @@ export default function Home() {
                 <div className="hm-card-tr" /><div className="hm-card-bl" />
               </div>
             ))}
+          </div>
+
+          {/* ✅ Defect class chips */}
+          <div className="hm-classes" style={{ opacity: statsVisible ? 1 : 0, transition: "all 0.8s ease 0.5s" }}>
+            <span className="hm-classes-label">DETECTS</span>
+            <div className="hm-class-pills">
+              {[
+                { name: "Missing Hole",    color: "#00c8ff" },
+                { name: "Mouse Bite",      color: "#ff9900" },
+                { name: "Open Circuit",    color: "#ff4455" },
+                { name: "Short",           color: "#ff00aa" },
+                { name: "Spur",            color: "#ffdd00" },
+                { name: "Spurious Copper", color: "#cc44ff" },
+              ].map(c => (
+                <span key={c.name} className="hm-class-pill" style={{ borderColor: c.color + "44", color: c.color, background: c.color + "11" }}>
+                  {c.name}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="hm-cta">
@@ -272,20 +294,21 @@ export default function Home() {
               <span className="hm-note-sep">·</span>
               <span>✓ Instant results</span>
               <span className="hm-note-sep">·</span>
-              <span>✓ Secure</span>
+              <span>✓ 693 training images</span>
             </div>
           </div>
 
         </div>
       )}
 
+      {/* ✅ Updated bottom bar with real model info */}
       <div className="hm-btm">
         <div className="hm-btm-l">
           <span className="hm-btm-item">STATUS: <span style={{ color: "#00ff78" }}>ONLINE</span></span>
           <span className="hm-btm-sep" />
-          <span className="hm-btm-item hm-btm-model">MODEL: <span style={{ color: "#00c8ff" }}>CNN-48L</span></span>
+          <span className="hm-btm-item hm-btm-model">MODEL: <span style={{ color: "#00c8ff" }}>YOLOv8m</span></span>
           <span className="hm-btm-sep hm-btm-sep-model" />
-          <span className="hm-btm-item">ACC: <span style={{ color: "#00ff78" }}>98.6%</span></span>
+          <span className="hm-btm-item">mAP@0.5: <span style={{ color: "#00ff78" }}>93.6%</span></span>
         </div>
         <span className="hm-btm-item hm-btm-copy">© 2025 PCB INSPECT AI</span>
       </div>
@@ -298,23 +321,16 @@ export default function Home() {
         @keyframes hm-dot{0%,100%{transform:scale(1);box-shadow:0 0 5px #00ff78}50%{transform:scale(1.4);box-shadow:0 0 14px #00ff78,0 0 30px rgba(0,255,120,0.4)}}
         @keyframes hm-ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:0.5}100%{transform:translate(-50%,-50%) scale(8);opacity:0}}
         @keyframes hm-noise{0%,100%{background-position:0 0}10%{background-position:-5% -10%}50%{background-position:-15% 10%}}
-        @keyframes hm-shine{0%{left:-100%}100%{left:230%}}
         @keyframes hm-glow{0%,100%{box-shadow:0 0 30px rgba(0,255,120,0.2)}50%{box-shadow:0 0 80px rgba(0,255,120,0.5),0 0 140px rgba(0,255,120,0.15)}}
         @keyframes hm-cursor{0%,49%{opacity:1}50%,100%{opacity:0}}
 
-        .hm-root{
-          min-height:100vh;position:relative;overflow-x:hidden;
-          background:radial-gradient(ellipse at 20% 40%,#031410 0%,#010c0a 35%,#010608 65%,#000408 100%);
-          font-family:'Share Tech Mono',monospace;
-          display:flex;flex-direction:column;align-items:stretch;color:#fff;
-        }
+        .hm-root{min-height:100vh;position:relative;overflow-x:hidden;background:radial-gradient(ellipse at 20% 40%,#031410 0%,#010c0a 35%,#010608 65%,#000408 100%);font-family:'Share Tech Mono',monospace;display:flex;flex-direction:column;align-items:stretch;color:#fff;}
         .hm-canvas{position:fixed;inset:0;z-index:0}
         .hm-vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse at center,transparent 20%,rgba(0,0,0,0.88) 100%)}
         .hm-noise{position:fixed;inset:0;z-index:3;opacity:0.025;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px 160px;animation:hm-noise 0.35s steps(1) infinite}
         .hm-scanline{position:fixed;left:0;right:0;height:2px;z-index:20;pointer-events:none;background:linear-gradient(90deg,transparent 0%,rgba(0,255,120,0.5) 50%,transparent 100%);box-shadow:0 0 16px rgba(0,255,120,0.3);transition:top 0.016s linear}
         .hm-ripple{position:fixed;z-index:50;pointer-events:none;width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,255,120,0.6);animation:hm-ripple 1.4s ease-out forwards}
 
-        /* TERMINAL */
         .hm-terminal-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding:20px 16px}
         .hm-terminal{width:100%;max-width:520px;background:rgba(0,0,0,0.88);backdrop-filter:blur(16px);border:1px solid rgba(0,255,120,0.22);border-radius:6px;overflow:hidden;box-shadow:0 0 60px rgba(0,255,120,0.07)}
         .hm-term-header{display:flex;align-items:center;gap:7px;padding:10px 16px;border-bottom:1px solid rgba(0,255,120,0.1);background:rgba(0,255,120,0.03)}
@@ -324,25 +340,13 @@ export default function Home() {
         .hm-term-line{font-size:11px;line-height:2;letter-spacing:0.5px}
         .hm-cursor{color:#00ff78;animation:hm-cursor 0.8s step-end infinite;font-size:13px}
 
-        /* CONTENT */
-        .hm-content{
-          position:relative;z-index:10;
-          display:flex;flex-direction:column;align-items:center;text-align:center;
-          padding:32px 20px 80px;
-          max-width:960px;width:100%;margin:0 auto;flex:1;justify-content:center;gap:0;
-        }
+        .hm-content{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;text-align:center;padding:32px 20px 80px;max-width:960px;width:100%;margin:0 auto;flex:1;justify-content:center;gap:0;}
 
-        /* Badge */
-        .hm-badge{
-          display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
-          border:1px solid rgba(0,255,120,0.2);background:rgba(0,255,120,0.03);
-          padding:6px 16px;margin-bottom:28px;
-        }
+        .hm-badge{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;border:1px solid rgba(0,255,120,0.2);background:rgba(0,255,120,0.03);padding:6px 16px;margin-bottom:28px;}
         .hm-badge-dot{width:6px;height:6px;border-radius:50%;background:#00ff78;display:inline-block;animation:hm-dot 1.8s ease-in-out infinite}
         .hm-badge-txt{font-size:8px;letter-spacing:2.5px;color:rgba(0,255,120,0.7);text-transform:uppercase}
         .hm-badge-sep{width:1px;height:11px;background:rgba(0,255,120,0.25)}
 
-        /* Title */
         .hm-title-block{position:relative;margin-bottom:24px}
         .hm-deco-row{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
         .hm-deco-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,0.45));max-width:100px}
@@ -350,48 +354,21 @@ export default function Home() {
         .hm-deco-line-b{background:linear-gradient(90deg,transparent,rgba(0,200,255,0.4))}
         .hm-deco-sq-b{background:#00c8ff;box-shadow:0 0 10px #00c8ff}
         .hm-title-row1{position:relative;display:block;line-height:1;margin-bottom:2px}
-        .hm-h1{
-          font-family:'Orbitron',sans-serif;font-weight:900;
-          font-size:clamp(28px,10vw,110px);
-          letter-spacing:clamp(3px,2vw,12px);line-height:1;
-          color:#fff;position:relative;z-index:1;display:block;
-        }
+        .hm-h1{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,10vw,110px);letter-spacing:clamp(3px,2vw,12px);line-height:1;color:#fff;position:relative;z-index:1;display:block;}
         .hm-glitch{position:absolute;top:0;left:0;right:0;font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,10vw,110px);letter-spacing:clamp(3px,2vw,12px);pointer-events:none;user-select:none}
         .hm-glitch-r{color:rgba(255,0,80,0.5);transform:translate(3px,-2px);clip-path:inset(30% 0 40% 0)}
         .hm-glitch-b{color:rgba(0,220,255,0.5);transform:translate(-3px,2px);clip-path:inset(60% 0 10% 0)}
         .hm-title-row2{display:flex;align-items:center;justify-content:center;gap:2px}
-        .hm-h2{
-          font-family:'Orbitron',sans-serif;font-weight:900;
-          font-size:clamp(28px,10vw,110px);
-          letter-spacing:clamp(3px,2vw,12px);line-height:1;
-          background:linear-gradient(100deg,#00ff78 0%,#00ffcc 40%,#00c8ff 100%);
-          -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-          filter:drop-shadow(0 0 40px rgba(0,255,120,0.6));
-        }
+        .hm-h2{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,10vw,110px);letter-spacing:clamp(3px,2vw,12px);line-height:1;background:linear-gradient(100deg,#00ff78 0%,#00ffcc 40%,#00c8ff 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 40px rgba(0,255,120,0.6));}
         .hm-cursor-blink{font-family:'Share Tech Mono',monospace;font-size:clamp(28px,10vw,110px);color:#00ff78;line-height:1;animation:hm-blink 1s step-end infinite;margin-left:-2px}
 
-        /* Tagline */
-        .hm-tagline{
-          font-family:'Rajdhani',sans-serif;font-weight:300;
-          font-size:clamp(14px,2.5vw,17px);
-          color:rgba(255,255,255,0.32);line-height:1.9;
-          max-width:480px;margin:20px 0 36px;padding:0 8px;
-        }
+        .hm-tagline{font-family:'Rajdhani',sans-serif;font-weight:300;font-size:clamp(14px,2.5vw,17px);color:rgba(255,255,255,0.32);line-height:1.9;max-width:480px;margin:20px 0 28px;padding:0 8px;}
         .hm-br-desktop{display:none}
         @media(min-width:600px){.hm-br-desktop{display:block}}
 
-        /* Stats */
-        .hm-stats{
-          display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
-          width:100%;max-width:640px;margin-bottom:40px;
-        }
+        .hm-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:640px;margin-bottom:20px;}
         @media(max-width:440px){.hm-stats{grid-template-columns:1fr;max-width:300px}}
-        .hm-stat-card{
-          padding:16px 14px 13px;
-          border:1px solid rgba(0,255,120,0.09);background:rgba(0,0,0,0.5);
-          backdrop-filter:blur(12px);text-align:left;position:relative;overflow:hidden;
-          transition:border-color 0.3s;
-        }
+        .hm-stat-card{padding:16px 14px 13px;border:1px solid rgba(0,255,120,0.09);background:rgba(0,0,0,0.5);backdrop-filter:blur(12px);text-align:left;position:relative;overflow:hidden;transition:border-color 0.3s;}
         .hm-stat-card:hover{border-color:rgba(0,255,120,0.28)}
         .hm-stat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
         .hm-stat-icon{font-size:11px;color:rgba(0,255,120,0.3);margin-top:4px}
@@ -403,43 +380,26 @@ export default function Home() {
         .hm-card-tr{position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 18px 18px 0;border-color:transparent rgba(0,255,120,0.1) transparent transparent}
         .hm-card-bl{position:absolute;bottom:0;left:0;width:0;height:0;border-style:solid;border-width:18px 0 0 18px;border-color:transparent transparent transparent rgba(0,255,120,0.07)}
 
-        /* CTA */
+        /* Defect class pills */
+        .hm-classes{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:32px;width:100%;max-width:640px;}
+        .hm-classes-label{font-size:8px;letter-spacing:3px;color:rgba(255,255,255,0.18);text-transform:uppercase}
+        .hm-class-pills{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+        .hm-class-pill{font-size:8px;letter-spacing:1.5px;border:1px solid;padding:4px 12px;text-transform:uppercase;transition:all 0.2s}
+        .hm-class-pill:hover{filter:brightness(1.3)}
+
         .hm-cta{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:480px}
-        .hm-btn{
-          position:relative;cursor:pointer;outline:none;
-          border:1px solid rgba(0,255,120,0.3);background:rgba(0,0,0,0.65);
-          color:#00ff78;font-family:'Orbitron',sans-serif;
-          font-size:clamp(9px,2.5vw,11px);font-weight:700;
-          padding:18px 24px;width:100%;
-          transition:all 0.35s cubic-bezier(0.4,0,0.2,1);
-          overflow:hidden;letter-spacing:clamp(2px,1vw,4px);
-          clip-path:polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);
-          -webkit-tap-highlight-color:transparent;
-        }
-        .hm-btn-hover,.hm-btn:hover{
-          background:rgba(0,255,120,0.09);border-color:rgba(0,255,120,0.65);
-          box-shadow:0 0 60px rgba(0,255,120,0.35),0 0 100px rgba(0,255,120,0.1),inset 0 0 40px rgba(0,255,120,0.04);
-          animation:hm-glow 1.2s ease-in-out infinite;
-        }
+        .hm-btn{position:relative;cursor:pointer;outline:none;border:1px solid rgba(0,255,120,0.3);background:rgba(0,0,0,0.65);color:#00ff78;font-family:'Orbitron',sans-serif;font-size:clamp(9px,2.5vw,11px);font-weight:700;padding:18px 24px;width:100%;transition:all 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;letter-spacing:clamp(2px,1vw,4px);clip-path:polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);-webkit-tap-highlight-color:transparent;}
+        .hm-btn-hover,.hm-btn:hover{background:rgba(0,255,120,0.09);border-color:rgba(0,255,120,0.65);box-shadow:0 0 60px rgba(0,255,120,0.35),0 0 100px rgba(0,255,120,0.1),inset 0 0 40px rgba(0,255,120,0.04);animation:hm-glow 1.2s ease-in-out infinite;}
         .hm-btn-inner{display:flex;align-items:center;justify-content:center;gap:12px;position:relative;z-index:1}
         .hm-cta-note{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,0.15);flex-wrap:wrap;justify-content:center}
         .hm-note-sep{color:rgba(0,255,120,0.25)}
 
-        /* Bottom bar */
-        .hm-btm{
-          position:fixed;bottom:0;left:0;right:0;z-index:40;
-          height:32px;display:flex;align-items:center;justify-content:space-between;
-          padding:0 16px;border-top:1px solid rgba(0,255,120,0.07);
-          background:rgba(0,0,0,0.8);backdrop-filter:blur(20px);
-        }
+        .hm-btm{position:fixed;bottom:0;left:0;right:0;z-index:40;height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-top:1px solid rgba(0,255,120,0.07);background:rgba(0,0,0,0.8);backdrop-filter:blur(20px);}
         .hm-btm-l{display:flex;align-items:center;gap:10px}
         .hm-btm-item{font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,0.2);text-transform:uppercase;white-space:nowrap}
         .hm-btm-sep{width:1px;height:12px;background:rgba(0,255,120,0.15)}
         .hm-btm-copy{font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,0.15)}
-        @media(max-width:480px){
-          .hm-btm-model{display:none}
-          .hm-btm-sep-model{display:none}
-        }
+        @media(max-width:480px){.hm-btm-model{display:none}.hm-btm-sep-model{display:none}}
       `}</style>
     </div>
   );

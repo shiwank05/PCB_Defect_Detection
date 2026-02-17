@@ -63,7 +63,6 @@ export default function Navbar({ accent = "#00ff78" }) {
         }
         .nb-scan{position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;z-index:5}
 
-        /* LOGO */
         .nb-logo{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;flex-shrink:0;min-width:0}
         .nb-logo-icon{
           width:32px;height:32px;display:flex;align-items:center;justify-content:center;
@@ -81,10 +80,8 @@ export default function Navbar({ accent = "#00ff78" }) {
         .nb-ai-dot{width:4px;height:4px;border-radius:50%;background:${accent};display:inline-block;animation:nb-blink 1.6s ease-in-out infinite}
         .nb-ai-txt{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1.5px;color:${accent}}
 
-        /* HIDE inspect on very small */
         @media(max-width:340px){.nb-logo-inspect{display:none}}
 
-        /* CENTER - desktop only */
         .nb-center{display:none;flex-direction:column;align-items:center;gap:5px;flex:1;max-width:280px}
         .nb-crumbs{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:2px}
         .nb-crumb-link{color:rgba(255,255,255,0.2);cursor:pointer;transition:color 0.2s}
@@ -101,7 +98,6 @@ export default function Navbar({ accent = "#00ff78" }) {
         .nb-chip-sep{width:1px;height:10px;background:rgba(255,255,255,0.1)}
         .nb-chip-model{color:rgba(255,255,255,0.18)}
 
-        /* DESKTOP NAV */
         .nb-nav{display:none;align-items:center;gap:24px}
         .nb-nav-link{
           display:flex;align-items:center;gap:6px;cursor:pointer;
@@ -116,7 +112,6 @@ export default function Navbar({ accent = "#00ff78" }) {
         .nb-nav-dot{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:${accent};box-shadow:0 0 5px ${accent}}
         .nb-sep{width:1px;height:18px;background:rgba(${rgb},0.15)}
 
-        /* HAMBURGER */
         .nb-burger{
           display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;
           width:44px;height:44px;cursor:pointer;background:none;border:none;padding:0;
@@ -127,7 +122,6 @@ export default function Navbar({ accent = "#00ff78" }) {
         .nb-burger.open .nb-burger-bar:nth-child(2){opacity:0;transform:scaleX(0)}
         .nb-burger.open .nb-burger-bar:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
 
-        /* MOBILE DRAWER */
         .nb-drawer{
           position:fixed;top:56px;left:0;right:0;
           background:rgba(1,5,4,0.98);
@@ -158,7 +152,6 @@ export default function Navbar({ accent = "#00ff78" }) {
         }
         .nb-drawer-status-dot{width:5px;height:5px;border-radius:50%;background:${accent};flex-shrink:0;animation:nb-blink 1.2s ease-in-out infinite}
 
-        /* RESPONSIVE SHOW/HIDE */
         @media(min-width:768px){
           .nb{padding:0 32px;height:62px}
           .nb-center{display:flex}
@@ -170,7 +163,7 @@ export default function Navbar({ accent = "#00ff78" }) {
 
       <header className="nb">
         <div className="nb-scan" style={{
-          background: `linear-gradient(90deg,transparent ${scanX-10}%,rgba(${rgb},0) ${scanX-8}%,rgba(${rgb},0.9) ${scanX}%,rgba(${rgb},0) ${scanX+8}%,transparent ${scanX+10}%)`
+          background: `linear-gradient(90deg,transparent ${scanX - 10}%,rgba(${rgb},0) ${scanX - 8}%,rgba(${rgb},0.9) ${scanX}%,rgba(${rgb},0) ${scanX + 8}%,transparent ${scanX + 10}%)`
         }} />
 
         <div className="nb-logo" onClick={() => navigate("/")} role="button" tabIndex={0}>
@@ -200,7 +193,8 @@ export default function Navbar({ accent = "#00ff78" }) {
             <span className="nb-chip-dot" />
             <span className="nb-chip-txt">ONLINE</span>
             <span className="nb-chip-sep" />
-            <span className="nb-chip-model">CNN-48L</span>
+            {/* ✅ Updated: CNN-48L → YOLOv8m */}
+            <span className="nb-chip-model">YOLOv8m</span>
           </div>
         </div>
 
@@ -246,9 +240,10 @@ export default function Navbar({ accent = "#00ff78" }) {
               {path === l.path && <span className="nb-drawer-badge">● ACTIVE</span>}
             </div>
           ))}
+          {/* ✅ Updated: CNN-48L → YOLOv8m, 98.6% ACC → 93.6% mAP */}
           <div className="nb-drawer-status">
             <span className="nb-drawer-status-dot" />
-            <span>SYSTEM ONLINE · CNN-48L · 98.6% ACC</span>
+            <span>SYSTEM ONLINE · YOLOv8m · 93.6% mAP</span>
           </div>
         </div>
       </div>
