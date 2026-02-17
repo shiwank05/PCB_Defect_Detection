@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 
-/* ── Fake data generator ── */
 function generateFakeResult(fileName) {
   const isDefect = Math.random() > 0.45;
   const defectTypes = [
@@ -16,7 +15,7 @@ function generateFakeResult(fileName) {
     { label: "Trace Integrity", icon: "◆" }, { label: "Pad Alignment", icon: "◎" },
     { label: "Copper Coverage", icon: "△" },
   ];
-  const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
+  const shuffle = arr => arr.sort(() => Math.random() - 0.5);
   const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   if (isDefect) {
     const picked = shuffle([...defectTypes]).slice(0, 3);
@@ -30,14 +29,13 @@ function generateFakeResult(fileName) {
   }
 }
 
-function Detect() {
+export default function Detect() {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadStep, setLoadStep] = useState(0);
   const [loadPct, setLoadPct] = useState(0);
-  const [hoverBtn, setHoverBtn] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [scanY, setScanY] = useState(0);
   const fileRef = useRef(null);
@@ -51,10 +49,7 @@ function Detect() {
     { label: "GENERATING REPORT", sub: "Compiling confidence scores..." },
   ];
 
-  useEffect(() => {
-    const t = setTimeout(() => setRevealed(true), 150);
-    return () => clearTimeout(t);
-  }, []);
+  useEffect(() => { setTimeout(() => setRevealed(true), 120); }, []);
 
   useEffect(() => {
     if (!preview) return;
@@ -68,176 +63,147 @@ function Detect() {
     return () => clearInterval(scanRef.current);
   }, [preview]);
 
-  const handleFile = (file) => {
+  const handleFile = file => {
     if (!file || !file.type.startsWith("image/")) return;
     setImage(file);
     setPreview(URL.createObjectURL(file));
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    handleFile(e.dataTransfer.files[0]);
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!image) return;
     setLoading(true); setLoadStep(0); setLoadPct(0);
     let step = 0;
-    const stepInterval = setInterval(() => {
-      step++;
-      if (step < steps.length) setLoadStep(step);
-      else clearInterval(stepInterval);
-    }, 700);
+    const si = setInterval(() => { step++; if (step < steps.length) setLoadStep(step); else clearInterval(si); }, 700);
     let pct = 0;
-    const pctInterval = setInterval(() => {
-      pct += Math.random() * 3.2;
-      if (pct >= 94) { pct = 94; clearInterval(pctInterval); }
-      setLoadPct(pct);
-    }, 80);
+    const pi = setInterval(() => { pct += Math.random() * 3.2; if (pct >= 94) { pct = 94; clearInterval(pi); } setLoadPct(pct); }, 80);
     setTimeout(() => {
-      clearInterval(stepInterval); clearInterval(pctInterval);
-      setLoadPct(100);
-      const fakeData = generateFakeResult(image.name);
-      setTimeout(() => navigate("/result", { state: fakeData }), 480);
+      clearInterval(si); clearInterval(pi); setLoadPct(100);
+      setTimeout(() => navigate("/result", { state: generateFakeResult(image.name) }), 480);
     }, 2800);
   };
 
   return (
-    <div style={S.root}>
-      <div style={S.hexGrid} />
-      <div style={S.vignette} />
-      <div style={S.noise} />
-      <div style={{ ...S.glow, top: -200, left: -200, background: "radial-gradient(circle, rgba(0,255,120,0.08) 0%, transparent 65%)", width: 600, height: 600 }} />
-      <div style={{ ...S.glow, bottom: -200, right: -200, background: "radial-gradient(circle, rgba(0,200,255,0.06) 0%, transparent 65%)", width: 700, height: 700 }} />
+    <div className="dt-root">
+      <div className="dt-grid" />
+      <div className="dt-vignette" />
+      <div className="dt-noise" />
 
-      {/* ── SHARED NAVBAR ── */}
       <Navbar accent="#00ff78" />
 
-      {/* Main */}
-      <main style={{ ...S.main, opacity: revealed ? 1 : 0, transform: revealed ? "translateY(0)" : "translateY(16px)", transition: "all 0.9s cubic-bezier(0.4,0,0.2,1)" }}>
+      <main className="dt-main" style={{ opacity: revealed ? 1 : 0, transform: revealed ? "translateY(0)" : "translateY(14px)", transition: "all 0.8s cubic-bezier(0.4,0,0.2,1)" }}>
 
-        {/* LEFT */}
-        <div style={S.leftPanel}>
-          <div style={S.moduleTag}><span style={S.moduleDot} />// UPLOAD MODULE</div>
-          <h2 style={S.heading}>SCAN YOUR<br /><span style={S.headingAccent}>CIRCUIT BOARD</span></h2>
-          <p style={S.desc}>Upload a PCB image and our convolutional neural network will analyze every trace, pad, and solder joint for manufacturing defects.</p>
-          <div style={S.infoStack}>
+        {/* ── LEFT PANEL (info) ── */}
+        <div className="dt-left">
+          <div className="dt-tag"><span className="dt-tag-dot" />// UPLOAD MODULE</div>
+          <h2 className="dt-heading">SCAN YOUR <span className="dt-heading-accent">CIRCUIT BOARD</span></h2>
+          <p className="dt-desc">Upload a PCB image and our CNN will analyze every trace, pad, and solder joint for manufacturing defects.</p>
+
+          <div className="dt-cards">
             {[
               { icon: "◈", title: "High Resolution", desc: "Min 512×512px recommended", num: "01" },
-              { icon: "◉", title: "Clear Focus", desc: "Sharp edges improve accuracy by 23%", num: "02" },
+              { icon: "◉", title: "Clear Focus", desc: "Sharp edges improve accuracy 23%", num: "02" },
               { icon: "◆", title: "Good Lighting", desc: "Avoid overexposed images", num: "03" },
-            ].map((c) => (
-              <div key={c.title} style={S.infoCard}>
-                <span style={S.infoNum}>{c.num}</span>
-                <div style={S.infoIconWrap}><span style={S.infoIcon}>{c.icon}</span></div>
-                <div style={S.infoText}>
-                  <div style={S.infoTitle}>{c.title}</div>
-                  <div style={S.infoDesc}>{c.desc}</div>
+            ].map(c => (
+              <div key={c.title} className="dt-card">
+                <span className="dt-card-num">{c.num}</span>
+                <div className="dt-card-icon"><span>{c.icon}</span></div>
+                <div className="dt-card-text">
+                  <div className="dt-card-title">{c.title}</div>
+                  <div className="dt-card-desc">{c.desc}</div>
                 </div>
-                <div style={S.infoBar} />
+                <div className="dt-card-bar" />
               </div>
             ))}
           </div>
-          <div style={S.traceDivider}>
-            <div style={S.traceLineL} />
-            <div style={S.traceNode} />
-            <div style={S.traceLineR} />
-          </div>
-          <div style={S.formats}>
-            <span style={S.formatsLabel}>SUPPORTED FORMATS</span>
-            <div style={S.formatPills}>
-              {["PNG", "JPG", "WEBP", "BMP", "TIFF"].map((f) => <span key={f} style={S.pill}>{f}</span>)}
+
+          <div className="dt-formats">
+            <span className="dt-formats-label">SUPPORTED FORMATS</span>
+            <div className="dt-pills">
+              {["PNG","JPG","WEBP","BMP","TIFF"].map(f => <span key={f} className="dt-pill">{f}</span>)}
             </div>
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div style={S.rightPanel}>
+        {/* ── RIGHT PANEL (upload + button) ── */}
+        <div className="dt-right">
           <div
-            style={{ ...S.dropzone, borderColor: dragging ? "#00ff78" : preview ? "rgba(0,255,120,0.5)" : "rgba(0,255,120,0.18)", background: dragging ? "rgba(0,255,120,0.06)" : preview ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)", boxShadow: dragging ? "0 0 60px rgba(0,255,120,0.2), inset 0 0 40px rgba(0,255,120,0.04)" : preview ? "0 0 40px rgba(0,255,120,0.1)" : "none" }}
+            className={`dt-drop${dragging ? " dt-drop-drag" : ""}${preview ? " dt-drop-has" : ""}`}
             onClick={() => !preview && fileRef.current.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
+            onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
           >
             {preview ? (
-              <div style={S.previewWrap}>
-                <div style={S.imgWrap}>
-                  <img src={preview} alt="PCB Preview" style={S.previewImg} />
-                  <div style={S.overlay}>
-                    <div style={{ position: "absolute", left: 0, right: 0, top: `${scanY}%`, height: 3, background: "linear-gradient(90deg, transparent 0%, rgba(0,255,120,0.1) 10%, rgba(0,255,120,0.9) 50%, rgba(0,255,120,0.1) 90%, transparent 100%)", boxShadow: "0 0 20px rgba(0,255,120,0.8), 0 0 40px rgba(0,255,120,0.3)", transition: "top 0.016s linear", pointerEvents: "none" }} />
-                    <div style={S.crossH} /><div style={S.crossV} />
-                    {[{ top: 0, left: 0, borderTop: "2px solid #00ff78", borderLeft: "2px solid #00ff78" }, { top: 0, right: 0, borderTop: "2px solid #00ff78", borderRight: "2px solid #00ff78" }, { bottom: 0, left: 0, borderBottom: "2px solid #00ff78", borderLeft: "2px solid #00ff78" }, { bottom: 0, right: 0, borderBottom: "2px solid #00ff78", borderRight: "2px solid #00ff78" }].map((c, i) => <div key={i} style={{ ...S.bigCorner, ...c }} />)}
-                    <div style={S.reticle}><div style={S.reticleRing} /><div style={S.reticleDot} /></div>
-                    <div style={S.scanBadge}><span style={S.scanBadgeDot} />SCANNING...</div>
+              <div className="dt-preview-wrap">
+                <div className="dt-img-wrap">
+                  <img src={preview} alt="PCB Preview" className="dt-preview-img" />
+                  {/* scan line */}
+                  <div className="dt-scan-overlay">
+                    <div className="dt-scan-line" style={{ top: `${scanY}%` }} />
+                    <div className="dt-cross-h" /><div className="dt-cross-v" />
+                    {[{top:0,left:0,bTop:true,bLeft:true},{top:0,right:0,bTop:true,bRight:true},{bottom:0,left:0,bBot:true,bLeft:true},{bottom:0,right:0,bBot:true,bRight:true}].map((c,i)=>(
+                      <div key={i} className="dt-corner" style={{ top:c.top,bottom:c.bottom,left:c.left,right:c.right,borderTop:c.bTop?"2px solid #00ff78":"none",borderLeft:c.bLeft?"2px solid #00ff78":"none",borderBottom:c.bBot?"2px solid #00ff78":"none",borderRight:c.bRight?"2px solid #00ff78":"none" }} />
+                    ))}
+                    <div className="dt-badge"><span className="dt-badge-dot" />SCANNING</div>
                   </div>
                 </div>
-                <div style={S.metaBar}>
-                  <div style={S.metaLeft}>
-                    <span style={S.metaCheck}>✓</span>
+                <div className="dt-meta">
+                  <div className="dt-meta-left">
+                    <span className="dt-meta-check">✓</span>
                     <div>
-                      <div style={S.metaName}>{image?.name}</div>
-                      <div style={S.metaSize}>{(image?.size / 1024).toFixed(1)} KB · {image?.type?.split("/")[1]?.toUpperCase()}</div>
+                      <div className="dt-meta-name">{image?.name}</div>
+                      <div className="dt-meta-size">{(image?.size / 1024).toFixed(1)} KB · {image?.type?.split("/")[1]?.toUpperCase()}</div>
                     </div>
                   </div>
-                  <button style={S.removeBtn} onClick={(e) => { e.stopPropagation(); setImage(null); setPreview(null); }}>✕ REMOVE</button>
+                  <button className="dt-remove" onClick={e => { e.stopPropagation(); setImage(null); setPreview(null); }}>✕ REMOVE</button>
                 </div>
               </div>
             ) : (
-              <div style={S.emptyDrop}>
-                <div style={S.hexIcon}>
-                  <svg width="80" height="80" viewBox="0 0 80 80">
-                    <polygon points="40,4 72,22 72,58 40,76 8,58 8,22" fill="none" stroke="rgba(0,255,120,0.3)" strokeWidth="1.5" />
-                    <polygon points="40,14 63,27 63,53 40,66 17,53 17,27" fill="none" stroke="rgba(0,255,120,0.15)" strokeWidth="1" />
-                    <text x="40" y="46" textAnchor="middle" fill="rgba(0,255,120,0.5)" fontSize="22" fontFamily="monospace">⬡</text>
-                  </svg>
-                </div>
-                <p style={S.emptyTitle}>DROP IMAGE HERE</p>
-                <p style={S.emptySub}>or click anywhere to browse</p>
-                <div style={S.emptyHint}><span style={S.emptyHintIcon}>↑</span>Drag & Drop your PCB scan<span style={S.emptyHintIcon}>↑</span></div>
+              <div className="dt-empty">
+                <svg width="70" height="70" viewBox="0 0 80 80" className="dt-empty-icon">
+                  <polygon points="40,4 72,22 72,58 40,76 8,58 8,22" fill="none" stroke="rgba(0,255,120,0.3)" strokeWidth="1.5" />
+                  <polygon points="40,14 63,27 63,53 40,66 17,53 17,27" fill="none" stroke="rgba(0,255,120,0.12)" strokeWidth="1" />
+                  <text x="40" y="46" textAnchor="middle" fill="rgba(0,255,120,0.4)" fontSize="20" fontFamily="monospace">⬡</text>
+                </svg>
+                <p className="dt-empty-title">DROP IMAGE HERE</p>
+                <p className="dt-empty-sub">or tap to browse files</p>
               </div>
             )}
           </div>
 
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
 
           {!loading ? (
             <button
-              style={{ ...S.analyzeBtn, opacity: image ? 1 : 0.38, cursor: image ? "pointer" : "not-allowed", ...(hoverBtn && image ? S.analyzeBtnHover : {}) }}
+              className={`dt-btn${!image ? " dt-btn-disabled" : ""}`}
               onClick={handleSubmit} disabled={!image}
-              onMouseEnter={() => setHoverBtn(true)} onMouseLeave={() => setHoverBtn(false)}
             >
-              {["tl", "tr", "bl", "br"].map((c) => (
-                <span key={c} style={{ ...S.bCorner, top: c.startsWith("t") ? -1 : "auto", bottom: c.startsWith("b") ? -1 : "auto", left: c.endsWith("l") ? -1 : "auto", right: c.endsWith("r") ? -1 : "auto", borderTopWidth: c.startsWith("t") ? 2 : 0, borderBottomWidth: c.startsWith("b") ? 2 : 0, borderLeftWidth: c.endsWith("l") ? 2 : 0, borderRightWidth: c.endsWith("r") ? 2 : 0, opacity: hoverBtn && image ? 1 : 0.22, transform: hoverBtn && image ? (c === "tl" ? "translate(-4px,-4px)" : c === "tr" ? "translate(4px,-4px)" : c === "bl" ? "translate(-4px,4px)" : "translate(4px,4px)") : "translate(0,0)", transition: "all 0.3s ease" }} />
-              ))}
-              {hoverBtn && image && <span style={S.shine} />}
-              <span style={S.analyzeBtnInner}>
-                <svg width="14" height="14" viewBox="0 0 14 14" style={{ opacity: 0.7 }}><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="#00ff78" strokeWidth="1.5" /></svg>
+              <span className="dt-btn-inner">
+                <svg width="13" height="13" viewBox="0 0 14 14" style={{ opacity: 0.7 }}><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="#00ff78" strokeWidth="1.5" /></svg>
                 RUN DEFECT ANALYSIS
-                <span style={{ opacity: 0.5 }}>→</span>
+                <span className="dt-btn-arrow">→</span>
               </span>
             </button>
           ) : (
-            <div style={S.loadBox}>
-              <div style={S.loadHeader}>
-                <div style={S.loadTitle}><span style={S.loadingDot} />ANALYZING...</div>
-                <span style={S.loadPctTxt}>{Math.round(loadPct)}%</span>
+            <div className="dt-loading">
+              <div className="dt-load-header">
+                <div className="dt-load-title"><span className="dt-load-dot" />ANALYZING...</div>
+                <span className="dt-load-pct">{Math.round(loadPct)}%</span>
               </div>
-              <div style={S.loadTrack}>
-                <div style={{ ...S.loadFill, width: `${loadPct}%` }} />
-                <div style={{ position: "absolute", top: -1, bottom: -1, left: `calc(${loadPct}% - 4px)`, width: 8, background: "#00ff78", boxShadow: "0 0 12px #00ff78,0 0 24px rgba(0,255,120,0.5)", borderRadius: 4, transition: "left 0.3s ease" }} />
+              <div className="dt-track">
+                <div className="dt-fill" style={{ width: `${loadPct}%` }} />
+                <div className="dt-fill-head" style={{ left: `calc(${loadPct}% - 4px)` }} />
               </div>
-              <div style={S.stepsWrap}>
+              <div className="dt-steps">
                 {steps.map((step, i) => (
-                  <div key={i} style={{ ...S.stepRow, opacity: i > loadStep ? 0.2 : 1, transition: "opacity 0.4s ease" }}>
-                    <div style={{ ...S.stepCheck, background: i < loadStep ? "#00ff78" : "transparent", borderColor: i <= loadStep ? "#00ff78" : "rgba(255,255,255,0.15)", boxShadow: i === loadStep ? "0 0 10px rgba(0,255,120,0.6)" : "none" }}>
-                      {i < loadStep && <span style={S.stepTick}>✓</span>}
-                      {i === loadStep && <span style={S.stepActive} />}
+                  <div key={i} className="dt-step" style={{ opacity: i > loadStep ? 0.2 : 1, transition: "opacity 0.4s ease" }}>
+                    <div className="dt-step-check" style={{ background: i < loadStep ? "#00ff78" : "transparent", borderColor: i <= loadStep ? "#00ff78" : "rgba(255,255,255,0.15)", boxShadow: i === loadStep ? "0 0 10px rgba(0,255,120,0.6)" : "none" }}>
+                      {i < loadStep && <span className="dt-step-tick">✓</span>}
+                      {i === loadStep && <span className="dt-step-active" />}
                     </div>
                     <div>
-                      <div style={{ ...S.stepLabel, color: i === loadStep ? "#00ff78" : i < loadStep ? "rgba(0,255,120,0.5)" : "rgba(255,255,255,0.2)" }}>{step.label}</div>
-                      {i === loadStep && <div style={S.stepSub}>{step.sub}</div>}
+                      <div className="dt-step-label" style={{ color: i === loadStep ? "#00ff78" : i < loadStep ? "rgba(0,255,120,0.5)" : "rgba(255,255,255,0.2)" }}>{step.label}</div>
+                      {i === loadStep && <div className="dt-step-sub">{step.sub}</div>}
                     </div>
                   </div>
                 ))}
@@ -246,107 +212,140 @@ function Detect() {
           )}
 
           {!loading && (
-            <div style={S.bottomHint}>
-              <span style={S.hintDash} />
-              <span style={S.hintText}>{image ? `Ready · ${image.name} loaded` : "No image selected"}</span>
-              <span style={S.hintDash} />
+            <div className="dt-hint">
+              <div className="dt-hint-line" />
+              <span className="dt-hint-txt">{image ? `Ready · ${image.name}` : "No image selected"}</span>
+              <div className="dt-hint-line" />
             </div>
           )}
         </div>
       </main>
-      <style>{CSS}</style>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
+        *{box-sizing:border-box}
+        @keyframes dt-dot{0%,100%{box-shadow:0 0 4px #00ff78}50%{box-shadow:0 0 10px #00ff78,0 0 20px #00ff78}}
+        @keyframes dt-pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+        @keyframes dt-noise{0%,100%{background-position:0 0}10%{background-position:-5% -10%}50%{background-position:-15% 10%}}
+        @keyframes dt-reticle{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.5}50%{transform:translate(-50%,-50%) scale(1.45);opacity:0.15}}
+
+        .dt-root{min-height:100vh;background:radial-gradient(ellipse at 15% 40%,#051510 0%,#020c10 45%,#010508 100%);font-family:'Share Tech Mono',monospace;color:#fff;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
+        .dt-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(0,255,120,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,120,0.022) 1px,transparent 1px);background-size:44px 44px}
+        .dt-vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.88) 100%)}
+        .dt-noise{position:fixed;inset:0;z-index:2;opacity:0.022;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:120px 120px;animation:dt-noise 0.4s steps(1) infinite}
+
+        /* LAYOUT */
+        .dt-main{
+          position:relative;z-index:10;flex:1;
+          display:flex;flex-direction:column;gap:28px;
+          padding:24px 16px 40px;width:100%;max-width:1280px;margin:0 auto;
+        }
+        @media(min-width:900px){
+          .dt-main{flex-direction:row;align-items:stretch;gap:0;padding:44px 40px 40px}
+          .dt-left{flex:0 0 340px;padding-right:48px;border-right:1px solid rgba(0,255,120,0.08)}
+          .dt-right{flex:1;padding-left:48px}
+        }
+
+        /* LEFT */
+        .dt-left{display:flex;flex-direction:column;gap:0}
+        .dt-tag{display:flex;align-items:center;gap:8px;color:rgba(0,255,120,0.5);font-size:10px;letter-spacing:2px;margin-bottom:16px}
+        .dt-tag-dot{width:5px;height:5px;border-radius:50%;background:#00ff78;animation:dt-dot 2s ease-in-out infinite}
+        .dt-heading{font-family:'Orbitron',sans-serif;font-size:clamp(20px,5vw,36px);font-weight:900;line-height:1.15;margin-bottom:14px;color:#fff}
+        .dt-heading-accent{background:linear-gradient(90deg,#00ff78,#00ffcc,#00c8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(0,255,120,0.5))}
+        .dt-desc{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:300;color:rgba(255,255,255,0.32);line-height:1.8;margin-bottom:24px}
+
+        .dt-cards{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+        /* hide cards on very small */
+        @media(max-width:400px){.dt-cards{display:none}}
+        .dt-card{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(0,255,120,0.08);background:rgba(0,255,120,0.015);position:relative;overflow:hidden}
+        .dt-card-num{font-family:'Orbitron',sans-serif;font-size:9px;color:rgba(0,255,120,0.22);min-width:18px}
+        .dt-card-icon{width:26px;height:26px;border:1px solid rgba(0,255,120,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(0,255,120,0.04);font-size:12px;color:#00ff78}
+        .dt-card-text{flex:1;min-width:0}
+        .dt-card-title{font-size:9px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.75);text-transform:uppercase;margin-bottom:2px}
+        .dt-card-desc{font-size:9px;color:rgba(255,255,255,0.28)}
+        .dt-card-bar{position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,transparent,#00ff78,transparent)}
+
+        .dt-formats{display:flex;flex-direction:column;gap:8px}
+        .dt-formats-label{font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,0.18);text-transform:uppercase}
+        .dt-pills{display:flex;gap:6px;flex-wrap:wrap}
+        .dt-pill{font-size:8px;letter-spacing:1.5px;border:1px solid rgba(0,255,120,0.15);color:rgba(0,255,120,0.4);padding:3px 9px;background:rgba(0,255,120,0.02)}
+
+        /* RIGHT */
+        .dt-right{display:flex;flex-direction:column;gap:14px}
+        .dt-drop{
+          flex:1;border:1px dashed rgba(0,255,120,0.2);background:rgba(0,0,0,0.3);
+          cursor:pointer;transition:all 0.3s ease;
+          display:flex;align-items:center;justify-content:center;
+          min-height:280px;position:relative;overflow:hidden;
+        }
+        @media(min-width:900px){.dt-drop{min-height:360px}}
+        .dt-drop-drag{border-color:#00ff78;background:rgba(0,255,120,0.06);box-shadow:0 0 50px rgba(0,255,120,0.18)}
+        .dt-drop-has{border-color:rgba(0,255,120,0.5);background:rgba(0,0,0,0.55)}
+
+        /* Preview */
+        .dt-preview-wrap{width:100%;height:100%;display:flex;flex-direction:column}
+        .dt-img-wrap{flex:1;position:relative;overflow:hidden;background:rgba(0,0,0,0.8)}
+        .dt-preview-img{width:100%;height:100%;min-height:220px;max-height:340px;object-fit:contain;display:block;filter:brightness(0.9) contrast(1.05)}
+        .dt-scan-overlay{position:absolute;inset:0;pointer-events:none}
+        .dt-scan-line{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 0%,rgba(0,255,120,0.9) 50%,transparent 100%);box-shadow:0 0 18px rgba(0,255,120,0.8);transition:top 0.016s linear}
+        .dt-cross-h{position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(0,255,120,0.07);transform:translateY(-50%)}
+        .dt-cross-v{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(0,255,120,0.07);transform:translateX(-50%)}
+        .dt-corner{position:absolute;width:20px;height:20px}
+        .dt-badge{position:absolute;top:10px;right:10px;font-size:9px;letter-spacing:2px;border:1px solid rgba(0,255,120,0.3);background:rgba(0,0,0,0.6);color:#00ff78;padding:4px 9px;display:flex;align-items:center;gap:5px}
+        .dt-badge-dot{width:5px;height:5px;border-radius:50%;background:#00ff78;display:inline-block;animation:dt-pulse 0.9s ease-in-out infinite}
+
+        .dt-meta{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.65);border-top:1px solid rgba(0,255,120,0.1);flex-wrap:wrap;gap:8px}
+        .dt-meta-left{display:flex;align-items:center;gap:10px}
+        .dt-meta-check{color:#00ff78;font-size:14px}
+        .dt-meta-name{font-size:11px;color:rgba(255,255,255,0.7);word-break:break-all;max-width:200px}
+        .dt-meta-size{font-size:9px;color:rgba(0,255,120,0.4);letter-spacing:1px}
+        .dt-remove{background:none;border:1px solid rgba(255,80,80,0.3);color:rgba(255,90,90,0.7);font-size:9px;letter-spacing:1.5px;padding:5px 12px;cursor:pointer;font-family:'Share Tech Mono',monospace;-webkit-tap-highlight-color:transparent}
+
+        /* Empty state */
+        .dt-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:36px 20px}
+        .dt-empty-icon{margin-bottom:4px}
+        .dt-empty-title{font-family:'Orbitron',sans-serif;font-size:clamp(11px,3.5vw,14px);letter-spacing:4px;color:rgba(255,255,255,0.45)}
+        .dt-empty-sub{font-size:11px;color:rgba(255,255,255,0.18)}
+
+        /* Analyze button */
+        .dt-btn{
+          position:relative;cursor:pointer;font-family:'Orbitron',sans-serif;
+          font-size:clamp(9px,2.5vw,11px);font-weight:700;color:#00ff78;
+          background:rgba(0,255,120,0.05);border:1px solid rgba(0,255,120,0.3);
+          padding:18px 20px;width:100%;
+          transition:all 0.3s ease;
+          box-shadow:0 0 16px rgba(0,255,120,0.1);
+          clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%);
+          overflow:hidden;letter-spacing:2.5px;
+          -webkit-tap-highlight-color:transparent;
+        }
+        .dt-btn:hover,.dt-btn:focus{background:rgba(0,255,120,0.1);border-color:rgba(0,255,120,0.6);box-shadow:0 0 50px rgba(0,255,120,0.28),inset 0 0 30px rgba(0,255,120,0.04)}
+        .dt-btn-disabled{opacity:0.35;cursor:not-allowed}
+        .dt-btn-inner{display:flex;align-items:center;justify-content:center;gap:12px;position:relative;z-index:1}
+        .dt-btn-arrow{opacity:0.5}
+
+        /* Loading */
+        .dt-loading{padding:18px 20px;border:1px solid rgba(0,255,120,0.2);background:rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:14px}
+        .dt-load-header{display:flex;justify-content:space-between;align-items:center}
+        .dt-load-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;color:#00ff78;display:flex;align-items:center;gap:8px}
+        .dt-load-dot{width:6px;height:6px;border-radius:50%;background:#00ff78;box-shadow:0 0 10px #00ff78;display:inline-block;animation:dt-pulse 0.7s ease-in-out infinite}
+        .dt-load-pct{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;color:#00ff78;text-shadow:0 0 18px rgba(0,255,120,0.6)}
+        .dt-track{height:5px;background:rgba(0,255,120,0.07);position:relative;overflow:visible}
+        .dt-fill{height:100%;background:linear-gradient(90deg,rgba(0,255,120,0.4),#00ff78);transition:width 0.3s ease;position:relative}
+        .dt-fill-head{position:absolute;top:-2px;bottom:-2px;width:7px;background:#00ff78;box-shadow:0 0 10px #00ff78;border-radius:3px;transition:left 0.3s ease}
+        .dt-steps{display:flex;flex-direction:column;gap:10px}
+        .dt-step{display:flex;align-items:flex-start;gap:10px}
+        .dt-step-check{width:18px;height:18px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all 0.4s ease}
+        .dt-step-tick{font-size:9px;color:#000}
+        .dt-step-active{width:6px;height:6px;border-radius:50%;background:#00ff78;animation:dt-pulse 0.8s ease-in-out infinite}
+        .dt-step-label{font-size:9px;letter-spacing:1.5px;transition:color 0.4s ease}
+        .dt-step-sub{font-size:9px;color:rgba(255,255,255,0.28);margin-top:2px}
+
+        /* Hint */
+        .dt-hint{display:flex;align-items:center;gap:10px}
+        .dt-hint-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,0.12))}
+        .dt-hint-txt{font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,0.16);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+      `}</style>
     </div>
   );
 }
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
-  * { box-sizing: border-box; }
-  @keyframes pdot    { 0%,100%{box-shadow:0 0 4px #00ff78,0 0 10px #00ff78}50%{box-shadow:0 0 8px #00ff78,0 0 24px #00ff78} }
-  @keyframes shimmer { 0%{left:-100%}100%{left:220%} }
-  @keyframes reticlePulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.6}50%{transform:translate(-50%,-50%) scale(1.4);opacity:0.2} }
-  @keyframes noise { 0%,100%{background-position:0 0}10%{background-position:-5% -10%}30%{background-position:7% -25%}50%{background-position:-15% 10%}70%{background-position:0% 15%}90%{background-position:-10% 10%} }
-  @keyframes scanBadgePulse { 0%,100%{opacity:1}50%{opacity:0.4} }
-`;
-
-const S = {
-  root: { minHeight:"100vh", background:"radial-gradient(ellipse at 15% 40%, #051510 0%, #020c10 45%, #010508 100%)", fontFamily:"'Share Tech Mono',monospace", color:"#fff", display:"flex", flexDirection:"column", position:"relative", overflow:"hidden" },
-  hexGrid: { position:"fixed", inset:0, zIndex:0, pointerEvents:"none", backgroundImage:"linear-gradient(rgba(0,255,120,0.025) 1px, transparent 1px),linear-gradient(90deg, rgba(0,255,120,0.025) 1px, transparent 1px)", backgroundSize:"44px 44px" },
-  vignette: { position:"fixed", inset:0, zIndex:1, pointerEvents:"none", background:"radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.88) 100%)" },
-  noise: { position:"fixed", inset:0, zIndex:2, opacity:0.022, pointerEvents:"none", backgroundImage:`url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize:"120px 120px", animation:"noise 0.4s steps(1) infinite" },
-  glow: { position:"fixed", borderRadius:"50%", zIndex:1, pointerEvents:"none" },
-  main: { position:"relative", zIndex:10, flex:1, display:"flex", gap:0, alignItems:"stretch", maxWidth:1280, margin:"0 auto", padding:"48px 40px 40px", width:"100%" },
-  leftPanel: { flex:"0 0 360px", paddingRight:56, display:"flex", flexDirection:"column", justifyContent:"center" },
-  moduleTag: { display:"flex", alignItems:"center", gap:8, color:"rgba(0,255,120,0.5)", fontSize:10, letterSpacing:"2px", marginBottom:24 },
-  moduleDot: { width:5, height:5, borderRadius:"50%", background:"#00ff78", animation:"pdot 2s ease-in-out infinite" },
-  heading: { fontFamily:"'Orbitron',sans-serif", fontSize:"clamp(28px,3.5vw,42px)", fontWeight:900, lineHeight:1.1, margin:"0 0 18px", color:"#fff" },
-  headingAccent: { background:"linear-gradient(90deg,#00ff78 0%,#00ffcc 50%,#00c8ff 100%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", backgroundClip:"text", filter:"drop-shadow(0 0 25px rgba(0,255,120,0.5))" },
-  desc: { fontFamily:"'Rajdhani',sans-serif", fontSize:14, fontWeight:300, color:"rgba(255,255,255,0.35)", lineHeight:1.85, marginBottom:36 },
-  infoStack: { display:"flex", flexDirection:"column", gap:10, marginBottom:32 },
-  infoCard: { display:"flex", alignItems:"center", gap:12, padding:"12px 16px 12px 14px", border:"1px solid rgba(0,255,120,0.08)", background:"rgba(0,255,120,0.018)", position:"relative", overflow:"hidden" },
-  infoNum: { fontFamily:"'Orbitron',sans-serif", fontSize:9, color:"rgba(0,255,120,0.25)", letterSpacing:"1px", minWidth:18 },
-  infoIconWrap: { width:28, height:28, border:"1px solid rgba(0,255,120,0.2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, background:"rgba(0,255,120,0.04)" },
-  infoIcon: { color:"#00ff78", fontSize:13 },
-  infoText: { flex:1 },
-  infoTitle: { fontSize:10, fontWeight:700, letterSpacing:"1.5px", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", marginBottom:2 },
-  infoDesc: { fontSize:10, color:"rgba(255,255,255,0.3)" },
-  infoBar: { position:"absolute", left:0, top:0, bottom:0, width:2, background:"linear-gradient(180deg,transparent,#00ff78,transparent)" },
-  traceDivider: { display:"flex", alignItems:"center", gap:0, marginBottom:24 },
-  traceLineL: { flex:1, height:1, background:"linear-gradient(90deg,transparent,rgba(0,255,120,0.3))" },
-  traceNode: { width:6, height:6, borderRadius:"50%", background:"#00ff78", boxShadow:"0 0 8px #00ff78", flexShrink:0 },
-  traceLineR: { flex:1, height:1, background:"linear-gradient(90deg,rgba(0,255,120,0.3),transparent)" },
-  formats: { display:"flex", flexDirection:"column", gap:10 },
-  formatsLabel: { fontSize:9, letterSpacing:"2.5px", color:"rgba(255,255,255,0.2)", textTransform:"uppercase" },
-  formatPills: { display:"flex", gap:6, flexWrap:"wrap" },
-  pill: { fontSize:9, letterSpacing:"1.5px", border:"1px solid rgba(0,255,120,0.15)", color:"rgba(0,255,120,0.45)", padding:"3px 10px", background:"rgba(0,255,120,0.03)" },
-  rightPanel: { flex:1, display:"flex", flexDirection:"column", gap:16, borderLeft:"1px solid rgba(0,255,120,0.08)", paddingLeft:56 },
-  dropzone: { flex:1, border:"1px dashed", cursor:"pointer", transition:"all 0.35s cubic-bezier(0.4,0,0.2,1)", display:"flex", alignItems:"center", justifyContent:"center", minHeight:380, position:"relative", overflow:"hidden" },
-  previewWrap: { width:"100%", height:"100%", display:"flex", flexDirection:"column", position:"relative" },
-  imgWrap: { flex:1, position:"relative", overflow:"hidden", background:"rgba(0,0,0,0.8)" },
-  previewImg: { width:"100%", height:"360px", objectFit:"contain", display:"block", filter:"brightness(0.9) contrast(1.05)" },
-  overlay: { position:"absolute", inset:0, pointerEvents:"none" },
-  crossH: { position:"absolute", top:"50%", left:0, right:0, height:1, background:"rgba(0,255,120,0.08)", transform:"translateY(-50%)" },
-  crossV: { position:"absolute", left:"50%", top:0, bottom:0, width:1, background:"rgba(0,255,120,0.08)", transform:"translateX(-50%)" },
-  bigCorner: { position:"absolute", width:22, height:22, borderStyle:"solid", borderColor:"#00ff78", borderWidth:0 },
-  reticle: { position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", pointerEvents:"none" },
-  reticleRing: { width:32, height:32, borderRadius:"50%", border:"1px solid rgba(0,255,120,0.4)", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", animation:"reticlePulse 2s ease-in-out infinite" },
-  reticleDot: { width:4, height:4, borderRadius:"50%", background:"#00ff78", boxShadow:"0 0 8px #00ff78", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)" },
-  scanBadge: { position:"absolute", top:12, right:12, fontSize:9, letterSpacing:"2px", border:"1px solid rgba(0,255,120,0.3)", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(6px)", color:"#00ff78", padding:"4px 10px", display:"flex", alignItems:"center", gap:6 },
-  scanBadgeDot: { width:5, height:5, borderRadius:"50%", background:"#00ff78", display:"inline-block", animation:"scanBadgePulse 0.9s ease-in-out infinite" },
-  metaBar: { padding:"10px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", background:"rgba(0,0,0,0.65)", borderTop:"1px solid rgba(0,255,120,0.12)" },
-  metaLeft: { display:"flex", alignItems:"center", gap:10 },
-  metaCheck: { color:"#00ff78", fontSize:14 },
-  metaName: { fontSize:11, color:"rgba(255,255,255,0.7)", marginBottom:1 },
-  metaSize: { fontSize:9, color:"rgba(0,255,120,0.4)", letterSpacing:"1.5px" },
-  removeBtn: { background:"none", border:"1px solid rgba(255,80,80,0.25)", color:"rgba(255,90,90,0.65)", fontSize:9, letterSpacing:"1.5px", padding:"4px 12px", cursor:"pointer", fontFamily:"'Share Tech Mono',monospace" },
-  emptyDrop: { display:"flex", flexDirection:"column", alignItems:"center", gap:12, padding:40 },
-  hexIcon: { marginBottom:8 },
-  emptyTitle: { fontFamily:"'Orbitron',sans-serif", fontSize:15, letterSpacing:"4px", color:"rgba(255,255,255,0.5)", margin:0 },
-  emptySub: { fontSize:11, color:"rgba(255,255,255,0.2)", margin:0 },
-  emptyHint: { marginTop:16, fontSize:9, letterSpacing:"2px", color:"rgba(0,255,120,0.35)", border:"1px solid rgba(0,255,120,0.12)", background:"rgba(0,255,120,0.025)", padding:"6px 16px", display:"flex", alignItems:"center", gap:10 },
-  emptyHintIcon: { opacity:0.4 },
-  analyzeBtn: { position:"relative", cursor:"pointer", fontFamily:"'Orbitron',sans-serif", fontSize:12, fontWeight:700, color:"#00ff78", background:"rgba(0,255,120,0.05)", border:"1px solid rgba(0,255,120,0.3)", padding:"20px 24px", transition:"all 0.35s cubic-bezier(0.4,0,0.2,1)", boxShadow:"0 0 20px rgba(0,255,120,0.12)", clipPath:"polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%)", overflow:"hidden", letterSpacing:"3px" },
-  analyzeBtnHover: { background:"rgba(0,255,120,0.1)", borderColor:"rgba(0,255,120,0.6)", boxShadow:"0 0 60px rgba(0,255,120,0.3),0 0 100px rgba(0,255,120,0.08),inset 0 0 40px rgba(0,255,120,0.04)", letterSpacing:"4px" },
-  bCorner: { position:"absolute", width:12, height:12, borderColor:"#00ff78", borderStyle:"solid", pointerEvents:"none" },
-  shine: { position:"absolute", top:0, left:"-100%", width:"55%", height:"100%", background:"linear-gradient(105deg,transparent 40%,rgba(0,255,120,0.1) 50%,transparent 60%)", animation:"shimmer 0.55s ease forwards", pointerEvents:"none" },
-  analyzeBtnInner: { display:"flex", alignItems:"center", justifyContent:"center", gap:14, position:"relative", zIndex:1 },
-  loadBox: { padding:"20px 24px", border:"1px solid rgba(0,255,120,0.2)", background:"rgba(0,0,0,0.5)", backdropFilter:"blur(10px)", display:"flex", flexDirection:"column", gap:16 },
-  loadHeader: { display:"flex", justifyContent:"space-between", alignItems:"center" },
-  loadTitle: { fontFamily:"'Orbitron',sans-serif", fontSize:11, letterSpacing:"3px", color:"#00ff78", display:"flex", alignItems:"center", gap:8 },
-  loadingDot: { width:6, height:6, borderRadius:"50%", background:"#00ff78", boxShadow:"0 0 10px #00ff78", display:"inline-block", animation:"scanBadgePulse 0.7s ease-in-out infinite" },
-  loadPctTxt: { fontFamily:"'Orbitron',sans-serif", fontSize:22, fontWeight:700, color:"#00ff78", textShadow:"0 0 20px rgba(0,255,120,0.6)" },
-  loadTrack: { height:6, background:"rgba(0,255,120,0.07)", position:"relative", overflow:"visible" },
-  loadFill: { height:"100%", background:"linear-gradient(90deg,rgba(0,255,120,0.4),#00ff78)", transition:"width 0.35s ease", position:"relative" },
-  stepsWrap: { display:"flex", flexDirection:"column", gap:12 },
-  stepRow: { display:"flex", alignItems:"flex-start", gap:12 },
-  stepCheck: { width:18, height:18, borderRadius:"50%", border:"2px solid", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1, transition:"all 0.4s ease" },
-  stepTick: { fontSize:9, color:"#000" },
-  stepActive: { width:6, height:6, borderRadius:"50%", background:"#00ff78", animation:"scanBadgePulse 0.8s ease-in-out infinite" },
-  stepLabel: { fontSize:10, letterSpacing:"1.5px", transition:"color 0.4s ease" },
-  stepSub: { fontSize:9, color:"rgba(255,255,255,0.3)", marginTop:2, letterSpacing:"0.5px" },
-  bottomHint: { display:"flex", alignItems:"center", gap:10, justifyContent:"center" },
-  hintDash: { flex:1, height:1, background:"linear-gradient(90deg,transparent,rgba(0,255,120,0.15))" },
-  hintText: { fontSize:9, letterSpacing:"2px", color:"rgba(255,255,255,0.18)", textTransform:"uppercase", whiteSpace:"nowrap" },
-};
-
-export default Detect;

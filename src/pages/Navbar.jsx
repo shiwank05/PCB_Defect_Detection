@@ -1,516 +1,257 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-/* ─── PCB Logo SVG ─────────────────────────────────────────────────── */
-function PCBLogo({ accent = "#00ff78", size = 36 }) {
+function PCBLogo({ accent = "#00ff78", size = 24 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Outer hex border */}
-      <polygon
-        points="24,2 44,13 44,35 24,46 4,35 4,13"
-        stroke={accent}
-        strokeWidth="1.2"
-        fill="none"
-        opacity="0.6"
-      />
-      {/* Inner hex */}
-      <polygon
-        points="24,8 38,16 38,32 24,40 10,32 10,16"
-        stroke={accent}
-        strokeWidth="0.8"
-        fill={`${accent}08`}
-        opacity="0.5"
-      />
-      {/* Circuit traces — horizontal */}
-      <line x1="4" y1="24" x2="12" y2="24" stroke={accent} strokeWidth="1.5" opacity="0.7" />
-      <line x1="36" y1="24" x2="44" y2="24" stroke={accent} strokeWidth="1.5" opacity="0.7" />
-      {/* Circuit traces — angled top */}
-      <line x1="14" y1="13" x2="10" y2="16" stroke={accent} strokeWidth="1.2" opacity="0.5" />
-      <line x1="34" y1="13" x2="38" y2="16" stroke={accent} strokeWidth="1.2" opacity="0.5" />
-      {/* Circuit traces — angled bottom */}
-      <line x1="14" y1="35" x2="10" y2="32" stroke={accent} strokeWidth="1.2" opacity="0.5" />
-      <line x1="34" y1="35" x2="38" y2="32" stroke={accent} strokeWidth="1.2" opacity="0.5" />
-      {/* Center IC chip body */}
-      <rect x="16" y="18" width="16" height="12" rx="1" stroke={accent} strokeWidth="1" fill={`${accent}10`} />
-      {/* IC pins — left */}
-      <line x1="10" y1="21" x2="16" y2="21" stroke={accent} strokeWidth="1" opacity="0.8" />
-      <line x1="10" y1="24" x2="16" y2="24" stroke={accent} strokeWidth="1" opacity="0.8" />
-      <line x1="10" y1="27" x2="16" y2="27" stroke={accent} strokeWidth="1" opacity="0.8" />
-      {/* IC pins — right */}
-      <line x1="32" y1="21" x2="38" y2="21" stroke={accent} strokeWidth="1" opacity="0.8" />
-      <line x1="32" y1="24" x2="38" y2="24" stroke={accent} strokeWidth="1" opacity="0.8" />
-      <line x1="32" y1="27" x2="38" y2="27" stroke={accent} strokeWidth="1" opacity="0.8" />
-      {/* Center dot — core */}
-      <circle cx="24" cy="24" r="2.5" fill={accent} opacity="0.9" />
-      <circle cx="24" cy="24" r="4.5" stroke={accent} strokeWidth="0.7" fill="none" opacity="0.4" />
-      {/* Corner pads */}
-      {[[18,20],[30,20],[18,28],[30,28]].map(([cx,cy],i) => (
-        <rect key={i} x={cx-1.5} y={cy-1.5} width="3" height="3" fill={accent} opacity="0.35" rx="0.5" />
-      ))}
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <polygon points="24,2 44,13 44,35 24,46 4,35 4,13" stroke={accent} strokeWidth="1.5" fill="none" opacity="0.7" />
+      <rect x="16" y="18" width="16" height="12" rx="1" stroke={accent} strokeWidth="1.2" fill={`${accent}15`} />
+      <line x1="4" y1="21" x2="16" y2="21" stroke={accent} strokeWidth="1.2" opacity="0.8" />
+      <line x1="4" y1="27" x2="16" y2="27" stroke={accent} strokeWidth="1.2" opacity="0.8" />
+      <line x1="32" y1="21" x2="44" y2="21" stroke={accent} strokeWidth="1.2" opacity="0.8" />
+      <line x1="32" y1="27" x2="44" y2="27" stroke={accent} strokeWidth="1.2" opacity="0.8" />
+      <circle cx="24" cy="24" r="3" fill={accent} opacity="0.9" />
     </svg>
   );
 }
 
-/* ─── Breadcrumb map ───────────────────────────────────────────────── */
 const ROUTE_META = {
-  "/":       { label: null,      breadcrumbs: [] },
-  "/detect": { label: "DETECT",  breadcrumbs: ["HOME"] },
-  "/result": { label: "RESULT",  breadcrumbs: ["HOME", "DETECT"] },
+  "/":       { label: "HOME",   crumbs: [] },
+  "/detect": { label: "DETECT", crumbs: ["HOME"] },
+  "/result": { label: "RESULT", crumbs: ["HOME", "DETECT"] },
 };
+const CRUMB_PATHS = { HOME: "/", DETECT: "/detect" };
 
-/* ─── Main Navbar ──────────────────────────────────────────────────── */
-export default function Navbar({ accent = "#00ff78", resultState = null }) {
+export default function Navbar({ accent = "#00ff78" }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [hovered, setHovered] = useState(null);
+  const [open, setOpen] = useState(false);
   const [scanX, setScanX] = useState(0);
-  const [pulse, setPulse] = useState(true);
-  const scanRef = useRef(null);
-
   const path = location.pathname;
   const meta = ROUTE_META[path] || ROUTE_META["/"];
+  const rgb = accent === "#00ff78" ? "0,255,120" : "255,68,85";
 
-  /* Animated scan line across top bar */
   useEffect(() => {
-    scanRef.current = setInterval(() => {
-      setScanX(x => (x + 1.2) % 102);
-    }, 16);
-    return () => clearInterval(scanRef.current);
-  }, []);
-
-  /* Pulse heartbeat */
-  useEffect(() => {
-    const id = setInterval(() => setPulse(p => !p), 900);
+    const id = setInterval(() => setScanX(x => (x + 1.5) % 102), 16);
     return () => clearInterval(id);
   }, []);
 
-  const navLinks = [
-    { path: "/",       label: "HOME",   icon: "⌂" },
+  useEffect(() => { setOpen(false); }, [path]);
+
+  const links = [
+    { path: "/", label: "HOME", icon: "⌂" },
     { path: "/detect", label: "DETECT", icon: "◎" },
   ];
-
-  const breadcrumbPaths = { "HOME": "/", "DETECT": "/detect" };
-
-  const accentRgb = accent === "#00ff78" ? "0,255,120" : "255,68,85";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;700;900&display=swap');
-        @keyframes navPulse {
-          0%,100% { box-shadow: 0 0 4px ${accent}, 0 0 8px ${accent}; }
-          50%      { box-shadow: 0 0 10px ${accent}, 0 0 22px ${accent}, 0 0 40px rgba(${accentRgb},0.3); }
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+        @keyframes nb-blink{0%,100%{opacity:1}50%{opacity:0.15}}
+        @keyframes nb-glow{0%,100%{box-shadow:0 0 5px ${accent}}50%{box-shadow:0 0 15px ${accent},0 0 30px rgba(${rgb},0.4)}}
+
+        *{box-sizing:border-box}
+
+        .nb{
+          position:relative;z-index:200;
+          display:flex;align-items:center;justify-content:space-between;
+          padding:0 16px;height:56px;
+          background:rgba(2,8,6,0.95);
+          backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+          border-bottom:1px solid rgba(${rgb},0.15);
+          flex-shrink:0;overflow:visible;
         }
-        @keyframes navShimmer {
-          0%   { left: -80%; }
-          100% { left: 120%; }
+        .nb-scan{position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;z-index:5}
+
+        /* LOGO */
+        .nb-logo{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;flex-shrink:0;min-width:0}
+        .nb-logo-icon{
+          width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+          border:1px solid rgba(${rgb},0.4);border-radius:3px;background:rgba(0,0,0,0.6);
+          flex-shrink:0;animation:nb-glow 2.5s ease-in-out infinite
         }
-        @keyframes navBlinkDot {
-          0%,100% { opacity: 1; }
-          50%     { opacity: 0.25; }
+        .nb-logo-words{display:flex;align-items:center;flex-shrink:1;min-width:0;overflow:hidden}
+        .nb-logo-pcb{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;color:#fff;letter-spacing:2px;white-space:nowrap}
+        .nb-logo-sep{color:${accent};font-size:14px;margin:0 1px}
+        .nb-logo-inspect{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:1.5px;white-space:nowrap}
+        .nb-ai{
+          flex-shrink:0;display:flex;align-items:center;gap:3px;margin-left:6px;
+          padding:2px 6px;border:1px solid rgba(255,255,255,0.1);border-radius:1px
         }
-        .nav-link-item:hover .nav-link-line {
-          width: 100% !important;
+        .nb-ai-dot{width:4px;height:4px;border-radius:50%;background:${accent};display:inline-block;animation:nb-blink 1.6s ease-in-out infinite}
+        .nb-ai-txt{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1.5px;color:${accent}}
+
+        /* HIDE inspect on very small */
+        @media(max-width:340px){.nb-logo-inspect{display:none}}
+
+        /* CENTER - desktop only */
+        .nb-center{display:none;flex-direction:column;align-items:center;gap:5px;flex:1;max-width:280px}
+        .nb-crumbs{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:2px}
+        .nb-crumb-link{color:rgba(255,255,255,0.2);cursor:pointer;transition:color 0.2s}
+        .nb-crumb-link:hover{color:rgba(255,255,255,0.55)}
+        .nb-crumb-sep{color:rgba(255,255,255,0.1)}
+        .nb-crumb-active{color:${accent}}
+        .nb-chip{
+          display:flex;align-items:center;gap:6px;padding:3px 10px;
+          border:1px solid rgba(${rgb},0.2);background:rgba(${rgb},0.04);
+          font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1.5px
         }
-        .nav-link-item:hover .nav-link-label {
-          color: ${accent} !important;
-          text-shadow: 0 0 12px rgba(${accentRgb},0.7);
+        .nb-chip-dot{width:5px;height:5px;border-radius:50%;background:${accent};animation:nb-blink 1.2s ease-in-out infinite}
+        .nb-chip-txt{color:rgba(${rgb},0.7)}
+        .nb-chip-sep{width:1px;height:10px;background:rgba(255,255,255,0.1)}
+        .nb-chip-model{color:rgba(255,255,255,0.18)}
+
+        /* DESKTOP NAV */
+        .nb-nav{display:none;align-items:center;gap:24px}
+        .nb-nav-link{
+          display:flex;align-items:center;gap:6px;cursor:pointer;
+          position:relative;padding-bottom:4px;
+          font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2.5px;
+          transition:color 0.25s
         }
-        .nav-link-item:hover .nav-link-icon {
-          opacity: 1 !important;
-          transform: scale(1.15);
+        .nb-nav-link:hover{color:${accent}!important}
+        .nb-nav-link:hover .nb-nav-line{width:100%!important}
+        .nb-nav-icon{font-size:11px;opacity:0.5}
+        .nb-nav-line{position:absolute;bottom:-2px;left:0;height:1px;transition:width 0.3s ease}
+        .nb-nav-dot{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:${accent};box-shadow:0 0 5px ${accent}}
+        .nb-sep{width:1px;height:18px;background:rgba(${rgb},0.15)}
+
+        /* HAMBURGER */
+        .nb-burger{
+          display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;
+          width:44px;height:44px;cursor:pointer;background:none;border:none;padding:0;
+          flex-shrink:0
         }
-        .nav-breadcrumb-link:hover {
-          color: rgba(255,255,255,0.65) !important;
+        .nb-burger-bar{width:22px;height:1.5px;background:rgba(${rgb},0.8);border-radius:1px;transition:all 0.3s ease;display:block}
+        .nb-burger.open .nb-burger-bar:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+        .nb-burger.open .nb-burger-bar:nth-child(2){opacity:0;transform:scaleX(0)}
+        .nb-burger.open .nb-burger-bar:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+
+        /* MOBILE DRAWER */
+        .nb-drawer{
+          position:fixed;top:56px;left:0;right:0;
+          background:rgba(1,5,4,0.98);
+          border-bottom:1px solid rgba(${rgb},0.2);
+          z-index:199;
+          max-height:0;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1)
+        }
+        .nb-drawer.open{max-height:400px}
+        .nb-drawer-inner{padding:6px 0 20px}
+        .nb-drawer-link{
+          display:flex;align-items:center;gap:14px;
+          padding:18px 24px;cursor:pointer;
+          font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;
+          color:rgba(255,255,255,0.38);
+          border-bottom:1px solid rgba(255,255,255,0.04);
+          transition:all 0.2s;min-height:60px
+        }
+        .nb-drawer-link:hover{background:rgba(${rgb},0.05);color:${accent}}
+        .nb-drawer-link.active{color:${accent};background:rgba(${rgb},0.04)}
+        .nb-drawer-icon{font-size:16px;width:24px;text-align:center}
+        .nb-drawer-badge{margin-left:auto;font-size:8px;letter-spacing:2px;color:${accent};opacity:0.7}
+        .nb-drawer-status{
+          margin:14px 20px 0;padding:10px 16px;
+          border:1px solid rgba(${rgb},0.12);background:rgba(${rgb},0.03);
+          display:flex;align-items:center;gap:8px;
+          font-family:'Share Tech Mono',monospace;font-size:9px;
+          color:rgba(255,255,255,0.25);letter-spacing:1.5px
+        }
+        .nb-drawer-status-dot{width:5px;height:5px;border-radius:50%;background:${accent};flex-shrink:0;animation:nb-blink 1.2s ease-in-out infinite}
+
+        /* RESPONSIVE SHOW/HIDE */
+        @media(min-width:768px){
+          .nb{padding:0 32px;height:62px}
+          .nb-center{display:flex}
+          .nb-nav{display:flex}
+          .nb-burger{display:none}
+          .nb-drawer{display:none}
         }
       `}</style>
 
-      <header style={styles.root}>
-
-        {/* Top scan line */}
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0,
-          height: 1,
-          background: `linear-gradient(90deg,
-            transparent ${scanX - 10}%,
-            rgba(${accentRgb},0.0) ${scanX - 8}%,
-            rgba(${accentRgb},0.8) ${scanX}%,
-            rgba(${accentRgb},0.0) ${scanX + 8}%,
-            transparent ${scanX + 10}%)`,
-          pointerEvents: "none", zIndex: 5,
+      <header className="nb">
+        <div className="nb-scan" style={{
+          background: `linear-gradient(90deg,transparent ${scanX-10}%,rgba(${rgb},0) ${scanX-8}%,rgba(${rgb},0.9) ${scanX}%,rgba(${rgb},0) ${scanX+8}%,transparent ${scanX+10}%)`
         }} />
 
-        {/* ── LEFT: Logo ── */}
-        <div style={styles.logoBlock} onClick={() => navigate("/")} role="button" tabIndex={0}>
-          {/* PCB icon */}
-          <div style={{ ...styles.logoIconWrap, borderColor: `rgba(${accentRgb},0.3)` }}>
-            <PCBLogo accent={accent} size={28} />
-            {/* Animated glow ring behind icon */}
-            <div style={{
-              position: "absolute", inset: -4, borderRadius: 2,
-              border: `1px solid rgba(${accentRgb},0.2)`,
-              animation: "navPulse 2.4s ease-in-out infinite",
-              pointerEvents: "none",
-            }} />
+        <div className="nb-logo" onClick={() => navigate("/")} role="button" tabIndex={0}>
+          <div className="nb-logo-icon"><PCBLogo accent={accent} size={20} /></div>
+          <div className="nb-logo-words">
+            <span className="nb-logo-pcb">PCB</span>
+            <span className="nb-logo-sep">·</span>
+            <span className="nb-logo-inspect">INSPECT</span>
           </div>
-
-          {/* Word mark */}
-          <div style={styles.logoText}>
-            <span style={styles.logoWordPCB}>PCB</span>
-            <span style={{ color: accent, fontFamily: "'Share Tech Mono',monospace", fontSize: 14, lineHeight: 1 }}>·</span>
-            <span style={styles.logoWordInspect}>INSPECT</span>
-            <div style={styles.logoBadge}>
-              <span style={{ ...styles.logoBadgeDot, background: accent, animation: "navBlinkDot 1.6s ease-in-out infinite" }} />
-              <span style={{ ...styles.logoBadgeText, color: accent }}>AI</span>
-            </div>
+          <div className="nb-ai">
+            <span className="nb-ai-dot" />
+            <span className="nb-ai-txt">AI</span>
           </div>
-
-          {/* Shimmer on logo hover */}
-          <div style={styles.logoShimmer} className="logo-shimmer" />
         </div>
 
-        {/* ── CENTER: Breadcrumb ── */}
-        <div style={styles.centerBlock}>
-          {/* Circuit trace decoration */}
-          <div style={{ ...styles.traceLine, background: `linear-gradient(90deg, transparent, rgba(${accentRgb},0.15), transparent)` }} />
-
-          <div style={styles.breadcrumbRow}>
-            {meta.breadcrumbs.map((crumb, i) => (
-              <span key={crumb} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  className="nav-breadcrumb-link"
-                  onClick={() => navigate(breadcrumbPaths[crumb])}
-                  style={styles.breadLink}
-                >
-                  {crumb}
-                </span>
-                <span style={styles.breadSep}>›</span>
+        <div className="nb-center">
+          <div className="nb-crumbs">
+            {meta.crumbs.map(c => (
+              <span key={c} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span className="nb-crumb-link" onClick={() => navigate(CRUMB_PATHS[c])}>{c}</span>
+                <span className="nb-crumb-sep">›</span>
               </span>
             ))}
-            {meta.label && (
-              <span style={{ ...styles.breadActive, color: accent }}>
-                {meta.label}
-              </span>
-            )}
-            {!meta.label && meta.breadcrumbs.length === 0 && (
-              <span style={{ ...styles.breadActive, color: `rgba(${accentRgb},0.5)` }}>
-                HOME
-              </span>
-            )}
+            <span className="nb-crumb-active">{meta.label}</span>
           </div>
-
-          {/* Status chip */}
-          <div style={{ ...styles.statusChip, borderColor: `rgba(${accentRgb},0.2)`, background: `rgba(${accentRgb},0.04)` }}>
-            <span style={{ ...styles.statusDot, background: accent, animation: "navBlinkDot 1.2s ease-in-out infinite" }} />
-            <span style={{ ...styles.statusText, color: `rgba(${accentRgb === "0,255,120" ? "0,255,120" : "255,68,85"},0.7)` }}>
-              SYSTEM ONLINE
-            </span>
-            <span style={styles.statusSep} />
-            <span style={styles.statusModel}>CNN-48L</span>
+          <div className="nb-chip">
+            <span className="nb-chip-dot" />
+            <span className="nb-chip-txt">ONLINE</span>
+            <span className="nb-chip-sep" />
+            <span className="nb-chip-model">CNN-48L</span>
           </div>
-
-          <div style={{ ...styles.traceLine, background: `linear-gradient(90deg, transparent, rgba(${accentRgb},0.15), transparent)` }} />
         </div>
 
-        {/* ── RIGHT: Nav links ── */}
-        <nav style={styles.navBlock}>
-          {navLinks.map((link) => {
-            const isActive = path === link.path;
+        <nav className="nb-nav">
+          {links.map(l => {
+            const active = path === l.path;
             return (
-              <div
-                key={link.path}
-                className="nav-link-item"
-                onClick={() => navigate(link.path)}
-                style={{
-                  ...styles.navLink,
-                  cursor: "pointer",
-                  position: "relative",
-                }}
-                onMouseEnter={() => setHovered(link.path)}
-                onMouseLeave={() => setHovered(null)}
-              >
-                <span
-                  className="nav-link-icon"
-                  style={{
-                    ...styles.navIcon,
-                    color: isActive ? accent : "rgba(255,255,255,0.3)",
-                    opacity: isActive ? 1 : 0.5,
-                    transition: "all 0.25s ease",
-                  }}
-                >
-                  {link.icon}
-                </span>
-                <span
-                  className="nav-link-label"
-                  style={{
-                    ...styles.navLabel,
-                    color: isActive ? accent : "rgba(255,255,255,0.32)",
-                    textShadow: isActive ? `0 0 12px rgba(${accentRgb},0.7)` : "none",
-                    transition: "all 0.25s ease",
-                  }}
-                >
-                  {link.label}
-                </span>
-
-                {/* Underline indicator */}
-                <div
-                  className="nav-link-line"
-                  style={{
-                    position: "absolute",
-                    bottom: -4,
-                    left: 0,
-                    height: 1,
-                    width: isActive ? "100%" : "0%",
-                    background: isActive
-                      ? `linear-gradient(90deg, transparent, ${accent}, transparent)`
-                      : `linear-gradient(90deg, transparent, rgba(${accentRgb},0.5), transparent)`,
-                    transition: "width 0.35s cubic-bezier(0.4,0,0.2,1)",
-                    boxShadow: isActive ? `0 0 6px ${accent}` : "none",
-                  }}
-                />
-
-                {/* Active dot */}
-                {isActive && (
-                  <div style={{
-                    position: "absolute",
-                    bottom: -8,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: 3,
-                    height: 3,
-                    borderRadius: "50%",
-                    background: accent,
-                    boxShadow: `0 0 6px ${accent}`,
-                  }} />
-                )}
+              <div key={l.path} className="nb-nav-link" onClick={() => navigate(l.path)}
+                style={{ color: active ? accent : "rgba(255,255,255,0.3)" }}>
+                <span className="nb-nav-icon">{l.icon}</span>
+                <span>{l.label}</span>
+                <div className="nb-nav-line" style={{
+                  width: active ? "100%" : "0%",
+                  background: `linear-gradient(90deg,transparent,${accent},transparent)`,
+                  boxShadow: active ? `0 0 6px ${accent}` : "none"
+                }} />
+                {active && <div className="nb-nav-dot" />}
               </div>
             );
           })}
-
-          {/* Vertical separator */}
-          <div style={{ ...styles.navSep, background: `rgba(${accentRgb},0.15)` }} />
-
-          {/* Signal strength indicator */}
-          <div style={styles.signalBlock}>
+          <div className="nb-sep" />
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 18 }}>
             {[1, 0.6, 0.3].map((h, i) => (
-              <div key={i} style={{
-                width: 3,
-                height: `${8 + h * 10}px`,
-                borderRadius: 1,
-                background: accent,
-                opacity: 0.2 + h * 0.7,
-                boxShadow: h === 1 ? `0 0 4px ${accent}` : "none",
-              }} />
+              <div key={i} style={{ width: 3, height: `${8 + h * 10}px`, borderRadius: 1, background: accent, opacity: 0.2 + h * 0.7 }} />
             ))}
           </div>
         </nav>
 
-        {/* Bottom border with animated trace */}
-        <div style={{
-          position: "absolute",
-          bottom: 0, left: 0, right: 0,
-          height: 1,
-          background: `linear-gradient(90deg,
-            transparent 0%,
-            rgba(${accentRgb},0.08) 20%,
-            rgba(${accentRgb},0.2) 50%,
-            rgba(${accentRgb},0.08) 80%,
-            transparent 100%)`,
-        }} />
+        <button className={`nb-burger${open ? " open" : ""}`} onClick={() => setOpen(o => !o)} aria-label="Menu">
+          <span className="nb-burger-bar" />
+          <span className="nb-burger-bar" />
+          <span className="nb-burger-bar" />
+        </button>
       </header>
+
+      <div className={`nb-drawer${open ? " open" : ""}`}>
+        <div className="nb-drawer-inner">
+          {links.map(l => (
+            <div key={l.path} className={`nb-drawer-link${path === l.path ? " active" : ""}`}
+              onClick={() => navigate(l.path)}>
+              <span className="nb-drawer-icon">{l.icon}</span>
+              <span>{l.label}</span>
+              {path === l.path && <span className="nb-drawer-badge">● ACTIVE</span>}
+            </div>
+          ))}
+          <div className="nb-drawer-status">
+            <span className="nb-drawer-status-dot" />
+            <span>SYSTEM ONLINE · CNN-48L · 98.6% ACC</span>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
-
-const styles = {
-  root: {
-    position: "relative",
-    zIndex: 50,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0 32px",
-    height: 62,
-    background: "rgba(0,0,0,0.72)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-
-  /* Logo */
-  logoBlock: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    cursor: "pointer",
-    position: "relative",
-    padding: "6px 10px 6px 0",
-    userSelect: "none",
-  },
-  logoIconWrap: {
-    position: "relative",
-    width: 38,
-    height: 38,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid",
-    borderRadius: 2,
-    background: "rgba(0,0,0,0.5)",
-    flexShrink: 0,
-  },
-  logoText: {
-    display: "flex",
-    alignItems: "center",
-    gap: 0,
-    position: "relative",
-  },
-  logoWordPCB: {
-    fontFamily: "'Orbitron', sans-serif",
-    fontSize: 15,
-    fontWeight: 900,
-    color: "#ffffff",
-    letterSpacing: "3px",
-  },
-  logoWordInspect: {
-    fontFamily: "'Orbitron', sans-serif",
-    fontSize: 15,
-    fontWeight: 400,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: "2px",
-    marginLeft: 2,
-  },
-  logoBadge: {
-    display: "flex",
-    alignItems: "center",
-    gap: 3,
-    marginLeft: 8,
-    padding: "1px 6px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "rgba(255,255,255,0.03)",
-    borderRadius: 1,
-  },
-  logoBadgeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: "50%",
-    display: "inline-block",
-  },
-  logoBadgeText: {
-    fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 8,
-    fontWeight: 700,
-    letterSpacing: "1.5px",
-  },
-  logoShimmer: {
-    position: "absolute",
-    top: 0, bottom: 0,
-    left: "-80%",
-    width: "60%",
-    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%)",
-    pointerEvents: "none",
-  },
-
-  /* Center */
-  centerBlock: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
-    maxWidth: 420,
-  },
-  traceLine: {
-    height: 1,
-    width: "80%",
-  },
-  breadcrumbRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 9,
-    letterSpacing: "2.5px",
-  },
-  breadLink: {
-    color: "rgba(255,255,255,0.22)",
-    cursor: "pointer",
-    textDecoration: "none",
-    transition: "color 0.2s ease",
-    fontFamily: "'Share Tech Mono', monospace",
-    letterSpacing: "2px",
-  },
-  breadSep: {
-    color: "rgba(255,255,255,0.12)",
-    fontSize: 10,
-  },
-  breadActive: {
-    fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 9,
-    letterSpacing: "2.5px",
-  },
-  statusChip: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "3px 12px",
-    border: "1px solid",
-    fontSize: 8,
-    letterSpacing: "2px",
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: "50%",
-    display: "inline-block",
-  },
-  statusText: {
-    fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 8,
-    letterSpacing: "2px",
-  },
-  statusSep: {
-    width: 1,
-    height: 10,
-    background: "rgba(255,255,255,0.1)",
-  },
-  statusModel: {
-    fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 8,
-    letterSpacing: "1.5px",
-    color: "rgba(255,255,255,0.2)",
-  },
-
-  /* Nav */
-  navBlock: {
-    display: "flex",
-    alignItems: "center",
-    gap: 28,
-  },
-  navLink: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    paddingBottom: 4,
-  },
-  navIcon: {
-    fontSize: 11,
-    transition: "all 0.25s ease",
-  },
-  navLabel: {
-    fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 9,
-    letterSpacing: "2.5px",
-    textTransform: "uppercase",
-  },
-  navSep: {
-    width: 1,
-    height: 18,
-  },
-  signalBlock: {
-    display: "flex",
-    alignItems: "flex-end",
-    gap: 2,
-    height: 18,
-  },
-};

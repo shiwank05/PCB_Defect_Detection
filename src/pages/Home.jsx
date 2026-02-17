@@ -2,10 +2,9 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Navbar from "./Navbar";
 
-/* ─── Boot sequence lines ─────────────────────────────────────────── */
 const BOOT_LINES = [
-  "> INITIALIZING PCB-INSPECT AI SYSTEM...",
-  "> LOADING NEURAL WEIGHTS [████████████] 100%",
+  "> INITIALIZING PCB-INSPECT AI...",
+  "> LOADING NEURAL WEIGHTS [████████] 100%",
   "> RESNET-48 BACKBONE READY",
   "> DEFECT CLASSIFIER ONLINE",
   "> ALL SYSTEMS OPERATIONAL ✓",
@@ -15,53 +14,43 @@ export default function Home() {
   const navigate = useNavigate();
   const canvasRef = useRef(null);
   const mouse = useRef({ x: 0.5, y: 0.5 });
-
   const [phase, setPhase] = useState("boot");
   const [bootLines, setBootLines] = useState([]);
   const [bootDone, setBootDone] = useState(false);
   const [titleVisible, setTitleVisible] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
-  const [glitch, setGlitch] = useState(0);
+  const [glitch, setGlitch] = useState(false);
   const [hoverBtn, setHoverBtn] = useState(false);
   const [ripples, setRipples] = useState([]);
   const [counts, setCounts] = useState({ c1: 0, c2: 0, c3: 0 });
-  const [vizBars, setVizBars] = useState(Array(20).fill(0));
+  const [vizBars, setVizBars] = useState(Array(16).fill(0));
   const [scanPos, setScanPos] = useState(0);
 
-  /* ─── Boot sequence ── */
   useEffect(() => {
-    let lineIdx = 0;
-    const addLine = () => {
-      if (lineIdx >= BOOT_LINES.length) {
-        setTimeout(() => { setBootDone(true); setPhase("title"); }, 400);
-        return;
-      }
-      setBootLines(p => [...p, BOOT_LINES[lineIdx]]);
-      lineIdx++;
-      setTimeout(addLine, 320 + Math.random() * 200);
+    let i = 0;
+    const add = () => {
+      if (i >= BOOT_LINES.length) { setTimeout(() => { setBootDone(true); setPhase("title"); }, 400); return; }
+      setBootLines(p => [...p, BOOT_LINES[i++]]);
+      setTimeout(add, 280 + Math.random() * 180);
     };
-    setTimeout(addLine, 300);
+    setTimeout(add, 300);
   }, []);
 
   useEffect(() => {
     if (phase !== "title") return;
-    setTimeout(() => setTitleVisible(true), 200);
-    setTimeout(() => setStatsVisible(true), 900);
+    setTimeout(() => setTitleVisible(true), 150);
+    setTimeout(() => setStatsVisible(true), 800);
   }, [phase]);
 
   useEffect(() => {
     if (!statsVisible) return;
     const targets = { c1: 98.6, c2: 2, c3: 12 };
     const ids = Object.keys(targets).map(key => {
-      let cur = 0;
-      const step = targets[key] / 55;
+      let cur = 0; const step = targets[key] / 55;
       return setInterval(() => {
         cur += step;
-        if (cur >= targets[key]) {
-          setCounts(p => ({ ...p, [key]: targets[key] }));
-        } else {
-          setCounts(p => ({ ...p, [key]: parseFloat(cur.toFixed(key === "c1" ? 1 : 0)) }));
-        }
+        if (cur >= targets[key]) setCounts(p => ({ ...p, [key]: targets[key] }));
+        else setCounts(p => ({ ...p, [key]: parseFloat(cur.toFixed(key === "c1" ? 1 : 0)) }));
       }, 22);
     });
     return () => ids.forEach(clearInterval);
@@ -69,45 +58,37 @@ export default function Home() {
 
   useEffect(() => {
     const id = setInterval(() => {
-      setGlitch(g => g + 1);
-      setTimeout(() => setGlitch(g => g + 1), 120);
-      setTimeout(() => setGlitch(g => g + 1), 240);
-    }, 3800);
+      setGlitch(true);
+      setTimeout(() => setGlitch(false), 180);
+    }, 4000);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setVizBars(prev => prev.map((_, i) =>
-        Math.max(0.05, Math.min(1, prev[i] * 0.7 + Math.random() * 0.5))
-      ));
+      setVizBars(p => p.map(v => Math.max(0.05, Math.min(1, v * 0.7 + Math.random() * 0.5))));
     }, 80);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setScanPos(p => (p + 0.4) % 101);
-    }, 16);
+    const id = setInterval(() => setScanPos(p => (p + 0.35) % 101), 16);
     return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
-    const fn = e => {
-      mouse.current = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight };
-    };
+    const fn = e => { mouse.current = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight }; };
     window.addEventListener("mousemove", fn);
     return () => window.removeEventListener("mousemove", fn);
   }, []);
 
-  const handleBgClick = useCallback((e) => {
+  const handleClick = useCallback(e => {
     if (e.target.closest("button") || e.target.closest("header")) return;
     const id = Date.now();
     setRipples(r => [...r, { id, x: e.clientX, y: e.clientY }]);
     setTimeout(() => setRipples(r => r.filter(x => x.id !== id)), 1400);
   }, []);
 
-  /* ─── Master canvas ── */
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -115,502 +96,351 @@ export default function Home() {
     let H = canvas.height = window.innerHeight;
     let animId, t = 0;
 
-    const HORIZON = H * 0.5;
-    const VP = { x: W / 2, y: HORIZON };
-
-    const hexSize = 32;
-    const cols = Math.ceil(W / (hexSize * 1.75)) + 3;
-    const rows = Math.ceil(H / (hexSize * 1.52)) + 3;
-    const hexes = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        hexes.push({
-          x: c * hexSize * 1.75 - hexSize,
-          y: r * hexSize * 1.52 + (c % 2 ? hexSize * 0.76 : 0) - hexSize,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.2 + Math.random() * 0.6,
-          active: Math.random() > 0.65,
-          hue: Math.random() > 0.8 ? 185 : 145,
-        });
-      }
-    }
-
-    const pts = Array.from({ length: 120 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      z: Math.random(),
-      vx: (Math.random() - 0.5) * 1.6, vy: (Math.random() - 0.5) * 1.6,
+    const pts = Array.from({ length: 80 }, () => ({
+      x: Math.random() * W, y: Math.random() * H, z: Math.random(),
+      vx: (Math.random() - 0.5) * 1.2, vy: (Math.random() - 0.5) * 1.2,
       trail: [], life: Math.random(),
     }));
-
-    const traces = Array.from({ length: 14 }, () => ({
+    const traces = Array.from({ length: 10 }, () => ({
       x: Math.random() * W, y: Math.random() * H,
-      len: 80 + Math.random() * 160,
-      angle: (Math.floor(Math.random() * 4) * Math.PI) / 2,
-      speed: 0.6 + Math.random() * 1.2,
-      progress: Math.random(),
-      width: 1 + Math.random() * 1.5,
+      len: 60 + Math.random() * 140, angle: (Math.floor(Math.random() * 4) * Math.PI) / 2,
+      speed: 0.5 + Math.random() * 1.0, progress: Math.random(), width: 1 + Math.random() * 1.2,
     }));
 
-    const drawHex = (x, y, size, alpha, fill, hue) => {
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (Math.PI / 3) * i - Math.PI / 6;
-        i === 0 ? ctx.moveTo(x + size * Math.cos(a), y + size * Math.sin(a))
-          : ctx.lineTo(x + size * Math.cos(a), y + size * Math.sin(a));
-      }
-      ctx.closePath();
-      if (fill) { ctx.fillStyle = `hsla(${hue},100%,55%,${alpha * 0.08})`; ctx.fill(); }
-      ctx.strokeStyle = `hsla(${hue},100%,55%,${alpha})`;
-      ctx.lineWidth = 0.6;
-      ctx.stroke();
-    };
-
     const draw = () => {
-      t += 0.007;
-      ctx.clearRect(0, 0, W, H);
+      t += 0.007; ctx.clearRect(0, 0, W, H);
+      const mx = mouse.current.x, my = mouse.current.y;
+      const vx = W * (0.3 + mx * 0.4), vy = H * (0.35 + my * 0.15);
 
-      const mx = mouse.current.x;
-      const my = mouse.current.y;
-      const vanishX = W * (0.3 + mx * 0.4);
-      const vanishY = H * (0.35 + my * 0.15);
-      const gridLines = 18;
-      for (let i = 0; i <= gridLines; i++) {
-        const frac = i / gridLines;
-        const xBase = W * frac;
-        const grad1 = ctx.createLinearGradient(xBase, H, vanishX, vanishY);
-        grad1.addColorStop(0, "rgba(0,255,120,0.18)");
-        grad1.addColorStop(0.5, "rgba(0,255,120,0.06)");
-        grad1.addColorStop(1, "rgba(0,255,120,0)");
-        ctx.beginPath();
-        ctx.moveTo(xBase, H);
-        ctx.lineTo(vanishX, vanishY);
-        ctx.strokeStyle = grad1;
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
+      for (let i = 0; i <= 14; i++) {
+        const xB = W * (i / 14);
+        const g = ctx.createLinearGradient(xB, H, vx, vy);
+        g.addColorStop(0, "rgba(0,255,120,0.15)"); g.addColorStop(1, "rgba(0,255,120,0)");
+        ctx.beginPath(); ctx.moveTo(xB, H); ctx.lineTo(vx, vy);
+        ctx.strokeStyle = g; ctx.lineWidth = 0.6; ctx.stroke();
       }
-      for (let j = 0; j < 10; j++) {
-        const yFrac = j / 10;
-        const y = vanishY + (H - vanishY) * (yFrac * yFrac);
-        const xLeft = vanishX - (W * 0.6) * (1 - yFrac);
-        const xRight = vanishX + (W * 0.6) * (1 - yFrac);
-        const alpha = (1 - yFrac) * 0.18;
-        const grad2 = ctx.createLinearGradient(xLeft, y, xRight, y);
-        grad2.addColorStop(0, `rgba(0,255,120,0)`);
-        grad2.addColorStop(0.5, `rgba(0,255,120,${alpha})`);
-        grad2.addColorStop(1, `rgba(0,255,120,0)`);
-        ctx.beginPath();
-        ctx.moveTo(xLeft, y);
-        ctx.lineTo(xRight, y);
-        ctx.strokeStyle = grad2;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
+      for (let j = 0; j < 8; j++) {
+        const yf = j / 8, y = vy + (H - vy) * yf * yf;
+        const xl = vx - W * 0.6 * (1 - yf), xr = vx + W * 0.6 * (1 - yf);
+        const g = ctx.createLinearGradient(xl, y, xr, y);
+        g.addColorStop(0, "rgba(0,255,120,0)"); g.addColorStop(0.5, `rgba(0,255,120,${(1-yf)*0.15})`); g.addColorStop(1, "rgba(0,255,120,0)");
+        ctx.beginPath(); ctx.moveTo(xl, y); ctx.lineTo(xr, y); ctx.strokeStyle = g; ctx.lineWidth = 0.7; ctx.stroke();
       }
-
-      hexes.forEach(h => {
-        const wave = Math.sin(t * h.speed + h.phase) * 0.5 + 0.5;
-        const alpha = h.active ? wave * 0.28 + 0.04 : 0.028;
-        drawHex(h.x, h.y, hexSize * 0.44, alpha, h.active && wave > 0.72, h.hue);
-        if (h.active && wave > 0.9) {
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = `hsl(${h.hue},100%,60%)`;
-          ctx.beginPath();
-          ctx.arc(h.x, h.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = `hsl(${h.hue},100%,70%)`;
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-      });
-
       traces.forEach(tr => {
         tr.progress += tr.speed / tr.len * 0.8;
-        if (tr.progress > 1.8) {
-          tr.x = Math.random() * W; tr.y = Math.random() * H;
-          tr.angle = (Math.floor(Math.random() * 4) * Math.PI) / 2;
-          tr.len = 80 + Math.random() * 180; tr.progress = 0;
-        }
-        const head = Math.min(tr.progress, 1);
-        const tail = Math.max(0, tr.progress - 0.6);
-        const hx = tr.x + Math.cos(tr.angle) * tr.len * head;
-        const hy = tr.y + Math.sin(tr.angle) * tr.len * head;
-        const tx2 = tr.x + Math.cos(tr.angle) * tr.len * tail;
-        const ty2 = tr.y + Math.sin(tr.angle) * tr.len * tail;
+        if (tr.progress > 1.8) { tr.x = Math.random() * W; tr.y = Math.random() * H; tr.angle = (Math.floor(Math.random() * 4) * Math.PI) / 2; tr.len = 60 + Math.random() * 150; tr.progress = 0; }
+        const head = Math.min(tr.progress, 1), tail = Math.max(0, tr.progress - 0.6);
         if (head > tail) {
-          const g = ctx.createLinearGradient(tx2, ty2, hx, hy);
-          g.addColorStop(0, "rgba(0,255,120,0)");
-          g.addColorStop(1, "rgba(0,255,180,0.7)");
-          ctx.beginPath(); ctx.moveTo(tx2, ty2); ctx.lineTo(hx, hy);
-          ctx.strokeStyle = g; ctx.lineWidth = tr.width; ctx.stroke();
-          ctx.shadowBlur = 12; ctx.shadowColor = "#00ff78";
-          ctx.beginPath(); ctx.arc(hx, hy, tr.width + 1, 0, Math.PI * 2);
-          ctx.fillStyle = "#00ffcc"; ctx.fill(); ctx.shadowBlur = 0;
+          const hx = tr.x + Math.cos(tr.angle) * tr.len * head, hy = tr.y + Math.sin(tr.angle) * tr.len * head;
+          const tx = tr.x + Math.cos(tr.angle) * tr.len * tail, ty2 = tr.y + Math.sin(tr.angle) * tr.len * tail;
+          const g = ctx.createLinearGradient(tx, ty2, hx, hy);
+          g.addColorStop(0, "rgba(0,255,120,0)"); g.addColorStop(1, "rgba(0,255,180,0.65)");
+          ctx.beginPath(); ctx.moveTo(tx, ty2); ctx.lineTo(hx, hy); ctx.strokeStyle = g; ctx.lineWidth = tr.width; ctx.stroke();
+          ctx.shadowBlur = 10; ctx.shadowColor = "#00ff78";
+          ctx.beginPath(); ctx.arc(hx, hy, tr.width + 0.5, 0, Math.PI * 2); ctx.fillStyle = "#00ffcc"; ctx.fill(); ctx.shadowBlur = 0;
         }
       });
-
       pts.forEach(p => {
-        const speed = 1 - p.z * 0.6;
-        p.x += p.vx * speed; p.y += p.vy * speed;
-        p.life -= 0.002 * speed;
-        if (p.life <= 0 || p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
-          p.x = Math.random() * W; p.y = Math.random() * H;
-          p.vx = (Math.random() - 0.5) * 1.6; p.vy = (Math.random() - 0.5) * 1.6;
-          p.life = 0.7 + Math.random() * 0.3; p.trail = [];
-        }
-        p.trail.push({ x: p.x, y: p.y });
-        if (p.trail.length > 22) p.trail.shift();
+        const sp = 1 - p.z * 0.6; p.x += p.vx * sp; p.y += p.vy * sp; p.life -= 0.002 * sp;
+        if (p.life <= 0 || p.x < 0 || p.x > W || p.y < 0 || p.y > H) { p.x = Math.random() * W; p.y = Math.random() * H; p.vx = (Math.random() - 0.5) * 1.2; p.vy = (Math.random() - 0.5) * 1.2; p.life = 0.7 + Math.random() * 0.3; p.trail = []; }
+        p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 18) p.trail.shift();
         if (p.trail.length > 2) {
-          ctx.beginPath();
-          ctx.moveTo(p.trail[0].x, p.trail[0].y);
-          p.trail.forEach(pt => ctx.lineTo(pt.x, pt.y));
-          const g2 = ctx.createLinearGradient(p.trail[0].x, p.trail[0].y, p.x, p.y);
-          const hue2 = p.z < 0.4 ? 165 : 195;
-          g2.addColorStop(0, `hsla(${hue2},100%,60%,0)`);
-          g2.addColorStop(1, `hsla(${hue2},100%,60%,${p.life * (1 - p.z * 0.5) * 0.6})`);
-          ctx.strokeStyle = g2;
-          ctx.lineWidth = (1 - p.z) * 2.5 + 0.3;
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(p.trail[0].x, p.trail[0].y); p.trail.forEach(pt => ctx.lineTo(pt.x, pt.y));
+          const g = ctx.createLinearGradient(p.trail[0].x, p.trail[0].y, p.x, p.y);
+          g.addColorStop(0, "hsla(165,100%,60%,0)"); g.addColorStop(1, `hsla(165,100%,60%,${p.life * 0.5})`);
+          ctx.strokeStyle = g; ctx.lineWidth = (1 - p.z) * 2 + 0.2; ctx.stroke();
         }
-        const sz = (1 - p.z) * 3 + 0.3;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, sz * p.life, 0, Math.PI * 2);
-        ctx.fillStyle = p.z < 0.4 ? `rgba(0,255,180,${p.life * 0.8})` : `rgba(0,200,255,${p.life * 0.4})`;
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, (1 - p.z) * 2.5 * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,255,180,${p.life * 0.7})`; ctx.fill();
       });
-
       for (let ri = 0; ri < 3; ri++) {
-        const rr = ((t * 55 + ri * 140) % Math.hypot(W, H)) * 0.8;
-        const ra = 1 - rr / (Math.hypot(W, H) * 0.8);
-        ctx.beginPath();
-        ctx.arc(W / 2, H / 2, rr, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(${ri % 2 ? "0,200,255" : "0,255,120"},${ra * 0.055})`;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        const rr = ((t * 50 + ri * 130) % Math.hypot(W, H)) * 0.75;
+        ctx.beginPath(); ctx.arc(W / 2, H / 2, rr, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0,255,120,${(1 - rr / Math.hypot(W, H)) * 0.04})`; ctx.lineWidth = 1.2; ctx.stroke();
       }
-
       animId = requestAnimationFrame(draw);
     };
     draw();
-
     const onResize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
     window.addEventListener("resize", onResize);
     return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", onResize); };
   }, []);
 
-  const isGlitching = glitch % 2 === 1;
-
   return (
-    <div style={R.root} onClick={handleBgClick}>
-      <canvas ref={canvasRef} style={R.canvas} />
-      <div style={R.vignette} />
-      <div style={R.noise} />
-      <div style={{ ...R.scanline, top: `${scanPos}%` }} />
+    <div className="hm-root" onClick={handleClick}>
+      <canvas ref={canvasRef} className="hm-canvas" />
+      <div className="hm-vignette" />
+      <div className="hm-noise" />
+      <div className="hm-scanline" style={{ top: `${scanPos}%` }} />
 
-      {ripples.map(r => (
-        <div key={r.id} style={{ ...R.ripple, left: r.x, top: r.y }} />
-      ))}
+      {ripples.map(r => <div key={r.id} className="hm-ripple" style={{ left: r.x, top: r.y }} />)}
 
-      {/* ── SHARED NAVBAR ── */}
       <Navbar accent="#00ff78" />
 
-      {/* ── MINI VIZ BAR (below navbar, right-aligned) ── */}
-      <div style={R.vizStrip}>
-        <div style={R.viz}>
-          {vizBars.map((h, i) => (
-            <div key={i} style={{ ...R.vizBar, height: `${8 + h * 22}px`, opacity: 0.4 + h * 0.6, background: i < 7 ? "#00ff78" : i < 14 ? "#00ffcc" : "#00c8ff" }} />
-          ))}
-        </div>
-        <div style={R.vizSep} />
-        <span style={R.vizLive}>LIVE</span>
-      </div>
-
-      {/* ── BOOT TERMINAL ── */}
+      {/* BOOT */}
       {phase === "boot" && (
-        <div style={R.terminalWrap}>
-          <div style={R.terminal}>
-            <div style={R.termHeader}>
-              <div style={{ ...R.termDot, background: "#ff5f57" }} />
-              <div style={{ ...R.termDot, background: "#febc2e" }} />
-              <div style={{ ...R.termDot, background: "#28c840" }} />
-              <span style={R.termTitle}>PCB-INSPECT-AI — SYSTEM INIT</span>
+        <div className="hm-terminal-wrap">
+          <div className="hm-terminal">
+            <div className="hm-term-header">
+              <span className="hm-term-dot" style={{ background: "#ff5f57" }} />
+              <span className="hm-term-dot" style={{ background: "#febc2e" }} />
+              <span className="hm-term-dot" style={{ background: "#28c840" }} />
+              <span className="hm-term-title">PCB-INSPECT-AI</span>
             </div>
-            <div style={R.termBody}>
+            <div className="hm-term-body">
               {bootLines.filter(Boolean).map((line, i) => (
-                <div key={i} style={{ ...R.termLine, color: line.includes("✓") ? "#00ff78" : line.includes("100%") ? "#00c8ff" : "rgba(0,255,120,0.7)" }}>
-                  {line}
-                </div>
+                <div key={i} className="hm-term-line" style={{ color: line.includes("✓") ? "#00ff78" : line.includes("100%") ? "#00c8ff" : "rgba(0,255,120,0.7)" }}>{line}</div>
               ))}
-              {!bootDone && <div style={R.termCursor}>█</div>}
+              {!bootDone && <span className="hm-cursor">█</span>}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MAIN CONTENT ── */}
+      {/* MAIN */}
       {phase === "title" && (
-        <div style={{
-          ...R.content,
-          opacity: titleVisible ? 1 : 0,
-          transform: titleVisible ? "translateY(0)" : "translateY(30px)",
-          transition: "all 1.2s cubic-bezier(0.22,1,0.36,1)",
-        }}>
-          <div style={R.sideL}>
-            <div style={R.sideRule} />
-            <span style={R.sideTxt}>◈ POWERED BY AI ◈</span>
-            <div style={R.sideRule} />
-          </div>
-          <div style={{ ...R.sideL, ...R.sideR }}>
-            <div style={R.sideRule} />
-            <span style={R.sideTxt}>◈ ML VISION MODEL ◈</span>
-            <div style={R.sideRule} />
+        <div className="hm-content" style={{ opacity: titleVisible ? 1 : 0, transform: titleVisible ? "translateY(0)" : "translateY(24px)", transition: "all 1.1s cubic-bezier(0.22,1,0.36,1)" }}>
+
+          <div className="hm-badge">
+            <span className="hm-badge-dot" />
+            <span className="hm-badge-txt">AI-POWERED INSPECTION</span>
+            <span className="hm-badge-sep" />
+            <span className="hm-badge-txt" style={{ color: "#00c8ff" }}>v2.4.0</span>
           </div>
 
-          <div style={R.badge}>
-            <span style={R.badgePulse} />
-            <span style={R.badgeTxt}>AI-POWERED INSPECTION SYSTEM</span>
-            <span style={R.badgeDivider} />
-            <span style={{ ...R.badgeTxt, color: "#00c8ff" }}>v2.4.0</span>
-            <span style={R.badgeDivider} />
-            <span style={{ ...R.badgeTxt, color: "rgba(0,255,120,0.5)" }}>2025</span>
-          </div>
-
-          <div style={R.titleBlock}>
-            <div style={R.titleTopDeco}>
-              <div style={R.decoLine} />
-              <div style={R.decoSquare} />
-              <div style={R.decoLine} />
+          <div className="hm-title-block">
+            <div className="hm-deco-row">
+              <div className="hm-deco-line" /><div className="hm-deco-sq" /><div className="hm-deco-line" />
             </div>
-
-            <div style={R.titleRow1}>
-              {isGlitching && (
-                <>
-                  <span style={{ ...R.glitchLayer, color: "rgba(255,0,80,0.55)", left: 3, top: -2, clipPath: "inset(30% 0 40% 0)" }}>PCB DEFECT</span>
-                  <span style={{ ...R.glitchLayer, color: "rgba(0,220,255,0.55)", left: -3, top: 2, clipPath: "inset(60% 0 10% 0)" }}>PCB DEFECT</span>
-                  <span style={{ ...R.glitchLayer, color: "rgba(255,0,80,0.3)", left: 6, top: 0, clipPath: "inset(10% 0 70% 0)" }}>PCB DEFECT</span>
-                </>
-              )}
-              <h1 style={R.h1}>PCB DEFECT</h1>
+            <div className="hm-title-row1">
+              {glitch && <><span className="hm-glitch hm-glitch-r">PCB DEFECT</span><span className="hm-glitch hm-glitch-b">PCB DEFECT</span></>}
+              <h1 className="hm-h1">PCB DEFECT</h1>
             </div>
-
-            <div style={R.titleRow2}>
-              <span style={R.h2}>DETECTION</span>
-              <span style={R.blinkCursor}>_</span>
+            <div className="hm-title-row2">
+              <span className="hm-h2">DETECTION</span>
+              <span className="hm-cursor-blink">_</span>
             </div>
-
-            <div style={{ ...R.titleTopDeco, marginTop: 12 }}>
-              <div style={{ ...R.decoLine, background: "linear-gradient(90deg, transparent, rgba(0,200,255,0.4))" }} />
-              <div style={{ ...R.decoSquare, background: "#00c8ff", boxShadow: "0 0 8px #00c8ff" }} />
-              <div style={{ ...R.decoLine, background: "linear-gradient(90deg, rgba(0,200,255,0.4), transparent)" }} />
-            </div>
-
-            <div style={R.circuitArmL}>
-              {[80, 40, 20].map((w, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center" }}>
-                  <div style={{ ...R.cNode, width: i === 0 ? 7 : 5, height: i === 0 ? 7 : 5, opacity: 1 - i * 0.25 }} />
-                  <div style={{ ...R.cLine, width: w, opacity: 1 - i * 0.3 }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ ...R.circuitArmL, ...R.circuitArmR }}>
-              {[20, 40, 80].map((w, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center" }}>
-                  <div style={{ ...R.cLine, width: w, opacity: 1 - (2 - i) * 0.3, background: "linear-gradient(90deg, rgba(0,255,120,0.1), rgba(0,255,120,0.5))" }} />
-                  <div style={{ ...R.cNode, width: i === 2 ? 7 : 5, height: i === 2 ? 7 : 5, opacity: 1 - (2 - i) * 0.25 }} />
-                </div>
-              ))}
+            <div className="hm-deco-row">
+              <div className="hm-deco-line hm-deco-line-b" /><div className="hm-deco-sq hm-deco-sq-b" /><div className="hm-deco-line hm-deco-line-b" />
             </div>
           </div>
 
-          <p style={R.tagline}>
-            Industrial-grade PCB defect detection powered by deep learning.
-            <br />
+          <p className="hm-tagline">
+            Industrial-grade PCB defect detection powered by deep learning.<br className="hm-br-desktop" />
             Upload. Analyze. Decide — in under 2 seconds.
           </p>
 
-          <div style={{ ...R.statsRow, opacity: statsVisible ? 1 : 0, transform: statsVisible ? "translateY(0)" : "translateY(16px)", transition: "all 0.9s ease 0.2s" }}>
+          <div className="hm-stats" style={{ opacity: statsVisible ? 1 : 0, transform: statsVisible ? "translateY(0)" : "translateY(12px)", transition: "all 0.8s ease 0.2s" }}>
             {[
               { val: counts.c1 > 0 ? `${counts.c1}%` : "—", label: "Accuracy", sub: "On benchmark dataset", icon: "◉" },
               { val: counts.c2 > 0 ? `<${counts.c2}s` : "—", label: "Scan Speed", sub: "Per board image", icon: "◈" },
-              { val: counts.c3 > 0 ? `${counts.c3}+` : "—", label: "Defect Types", sub: "Classified automatically", icon: "◆" },
+              { val: counts.c3 > 0 ? `${counts.c3}+` : "—", label: "Defect Types", sub: "Auto classified", icon: "◆" },
             ].map((s, i) => (
-              <div key={i} style={R.statCard} onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(0,255,120,0.3)"} onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(0,255,120,0.08)"}>
-                <div style={R.statCardTop}>
-                  <span style={R.statIcon}>{s.icon}</span>
-                  <span style={{ ...R.statVal, textShadow: `0 0 30px rgba(0,255,120,${0.3 + (counts.c1 / 100) * 0.5})` }}>{s.val}</span>
+              <div key={i} className="hm-stat-card">
+                <div className="hm-stat-top">
+                  <span className="hm-stat-icon">{s.icon}</span>
+                  <span className="hm-stat-val">{s.val}</span>
                 </div>
-                <div style={R.statLabel}>{s.label}</div>
-                <div style={R.statSub}>{s.sub}</div>
-                <div style={R.statBarTrack}>
-                  <div style={{ ...R.statBarFill, width: counts.c1 > 0 ? "100%" : "0%", transitionDelay: `${0.6 + i * 0.18}s` }} />
-                </div>
-                <div style={R.cardCornerTR} />
-                <div style={R.cardCornerBL} />
+                <span className="hm-stat-label">{s.label}</span>
+                <span className="hm-stat-sub">{s.sub}</span>
+                <div className="hm-stat-bar"><div className="hm-stat-bar-fill" style={{ width: counts.c1 > 0 ? "100%" : "0%", transitionDelay: `${0.6 + i * 0.18}s` }} /></div>
+                <div className="hm-card-tr" /><div className="hm-card-bl" />
               </div>
             ))}
           </div>
 
-          <div style={R.ctaWrap}>
-            <div style={{ ...R.ctaRing, opacity: hoverBtn ? 1 : 0 }} />
+          <div className="hm-cta">
             <button
-              style={{ ...R.btn, ...(hoverBtn ? R.btnHover : {}) }}
+              className={`hm-btn${hoverBtn ? " hm-btn-hover" : ""}`}
               onClick={() => navigate("/detect")}
               onMouseEnter={() => setHoverBtn(true)}
               onMouseLeave={() => setHoverBtn(false)}
+              onTouchStart={() => setHoverBtn(true)}
+              onTouchEnd={() => { setHoverBtn(false); navigate("/detect"); }}
             >
-              {[["tl"], ["tr"], ["bl"], ["br"]].map(([id]) => (
-                <span key={id} style={{
-                  ...R.btnCorner,
-                  top: id.startsWith("t") ? -1 : "auto",
-                  bottom: id.startsWith("b") ? -1 : "auto",
-                  left: id.endsWith("l") ? -1 : "auto",
-                  right: id.endsWith("r") ? -1 : "auto",
-                  borderTopWidth: id.startsWith("t") ? 2 : 0,
-                  borderBottomWidth: id.startsWith("b") ? 2 : 0,
-                  borderLeftWidth: id.endsWith("l") ? 2 : 0,
-                  borderRightWidth: id.endsWith("r") ? 2 : 0,
-                  transform: hoverBtn
-                    ? id === "tl" ? "translate(-5px,-5px)" : id === "tr" ? "translate(5px,-5px)"
-                      : id === "bl" ? "translate(-5px,5px)" : "translate(5px,5px)"
-                    : "translate(0,0)",
-                  opacity: hoverBtn ? 1 : 0.2,
-                }} />
-              ))}
-              {hoverBtn && <span style={R.btnShine} />}
-              <span style={R.btnContent}>
-                <span style={R.btnHexL}>
-                  <svg width="18" height="18" viewBox="0 0 18 18"><polygon points="9,1 17,5.5 17,12.5 9,17 1,12.5 1,5.5" fill="none" stroke="#00ff78" strokeWidth="1.5" /><polygon points="9,5 13,7.5 13,10.5 9,13 5,10.5 5,7.5" fill="rgba(0,255,120,0.15)" stroke="#00ff78" strokeWidth="1" /></svg>
-                </span>
-                <span style={{ letterSpacing: hoverBtn ? "7px" : "4px", transition: "letter-spacing 0.4s cubic-bezier(0.4,0,0.2,1)" }}>
-                  INITIATE SCAN SEQUENCE
-                </span>
-                <span style={R.btnHexL}>
-                  <svg width="18" height="18" viewBox="0 0 18 18"><polygon points="9,1 17,5.5 17,12.5 9,17 1,12.5 1,5.5" fill="none" stroke="#00ff78" strokeWidth="1.5" /><polygon points="9,5 13,7.5 13,10.5 9,13 5,10.5 5,7.5" fill="rgba(0,255,120,0.15)" stroke="#00ff78" strokeWidth="1" /></svg>
-                </span>
+              <span className="hm-btn-inner">
+                <svg width="16" height="16" viewBox="0 0 18 18" style={{ opacity: 0.7, flexShrink: 0 }}>
+                  <polygon points="9,1 17,5.5 17,12.5 9,17 1,12.5 1,5.5" fill="none" stroke="#00ff78" strokeWidth="1.5" />
+                  <polygon points="9,5 13,7.5 13,10.5 9,13 5,10.5 5,7.5" fill="rgba(0,255,120,0.15)" stroke="#00ff78" strokeWidth="1" />
+                </svg>
+                INITIATE SCAN SEQUENCE
+                <span style={{ opacity: 0.5 }}>→</span>
               </span>
             </button>
-            <div style={R.ctaNote}>
-              <span style={R.ctaNoteItem}>✓ No account required</span>
-              <span style={R.ctaNoteSep}>·</span>
-              <span style={R.ctaNoteItem}>✓ Instant results</span>
-              <span style={R.ctaNoteSep}>·</span>
-              <span style={R.ctaNoteItem}>✓ Secure processing</span>
+            <div className="hm-cta-note">
+              <span>✓ No account</span>
+              <span className="hm-note-sep">·</span>
+              <span>✓ Instant results</span>
+              <span className="hm-note-sep">·</span>
+              <span>✓ Secure</span>
             </div>
           </div>
+
         </div>
       )}
 
-      {/* ── BOTTOM BAR ── */}
-      <div style={R.btmBar}>
-        <div style={R.btmBarL}>
-          <span style={R.btmItem}>STATUS: <span style={{ color: "#00ff78" }}>OPERATIONAL</span></span>
-          <div style={R.btmSep} />
-          <span style={R.btmItem}>MODEL: <span style={{ color: "#00c8ff" }}>CNN-RESNET-48L</span></span>
-          <div style={R.btmSep} />
-          <span style={R.btmItem}>ACCURACY: <span style={{ color: "#00ff78" }}>98.6%</span></span>
+      <div className="hm-btm">
+        <div className="hm-btm-l">
+          <span className="hm-btm-item">STATUS: <span style={{ color: "#00ff78" }}>ONLINE</span></span>
+          <span className="hm-btm-sep" />
+          <span className="hm-btm-item hm-btm-model">MODEL: <span style={{ color: "#00c8ff" }}>CNN-48L</span></span>
+          <span className="hm-btm-sep hm-btm-sep-model" />
+          <span className="hm-btm-item">ACC: <span style={{ color: "#00ff78" }}>98.6%</span></span>
         </div>
-        <div style={R.btmBarR}>
-          <span style={R.btmItem}>© 2025 PCB INSPECT AI</span>
-        </div>
+        <span className="hm-btm-item hm-btm-copy">© 2025 PCB INSPECT AI</span>
       </div>
 
-      <style>{CSS}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+
+        @keyframes hm-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+        @keyframes hm-dot{0%,100%{transform:scale(1);box-shadow:0 0 5px #00ff78}50%{transform:scale(1.4);box-shadow:0 0 14px #00ff78,0 0 30px rgba(0,255,120,0.4)}}
+        @keyframes hm-ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:0.5}100%{transform:translate(-50%,-50%) scale(8);opacity:0}}
+        @keyframes hm-noise{0%,100%{background-position:0 0}10%{background-position:-5% -10%}50%{background-position:-15% 10%}}
+        @keyframes hm-shine{0%{left:-100%}100%{left:230%}}
+        @keyframes hm-glow{0%,100%{box-shadow:0 0 30px rgba(0,255,120,0.2)}50%{box-shadow:0 0 80px rgba(0,255,120,0.5),0 0 140px rgba(0,255,120,0.15)}}
+        @keyframes hm-cursor{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+        .hm-root{
+          min-height:100vh;position:relative;overflow-x:hidden;
+          background:radial-gradient(ellipse at 20% 40%,#031410 0%,#010c0a 35%,#010608 65%,#000408 100%);
+          font-family:'Share Tech Mono',monospace;
+          display:flex;flex-direction:column;align-items:stretch;color:#fff;
+        }
+        .hm-canvas{position:fixed;inset:0;z-index:0}
+        .hm-vignette{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse at center,transparent 20%,rgba(0,0,0,0.88) 100%)}
+        .hm-noise{position:fixed;inset:0;z-index:3;opacity:0.025;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:160px 160px;animation:hm-noise 0.35s steps(1) infinite}
+        .hm-scanline{position:fixed;left:0;right:0;height:2px;z-index:20;pointer-events:none;background:linear-gradient(90deg,transparent 0%,rgba(0,255,120,0.5) 50%,transparent 100%);box-shadow:0 0 16px rgba(0,255,120,0.3);transition:top 0.016s linear}
+        .hm-ripple{position:fixed;z-index:50;pointer-events:none;width:60px;height:60px;border-radius:50%;border:1px solid rgba(0,255,120,0.6);animation:hm-ripple 1.4s ease-out forwards}
+
+        /* TERMINAL */
+        .hm-terminal-wrap{flex:1;display:flex;align-items:center;justify-content:center;position:relative;z-index:10;padding:20px 16px}
+        .hm-terminal{width:100%;max-width:520px;background:rgba(0,0,0,0.88);backdrop-filter:blur(16px);border:1px solid rgba(0,255,120,0.22);border-radius:6px;overflow:hidden;box-shadow:0 0 60px rgba(0,255,120,0.07)}
+        .hm-term-header{display:flex;align-items:center;gap:7px;padding:10px 16px;border-bottom:1px solid rgba(0,255,120,0.1);background:rgba(0,255,120,0.03)}
+        .hm-term-dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+        .hm-term-title{font-size:9px;color:rgba(255,255,255,0.25);letter-spacing:1px;margin-left:6px}
+        .hm-term-body{padding:18px 20px 22px;min-height:140px}
+        .hm-term-line{font-size:11px;line-height:2;letter-spacing:0.5px}
+        .hm-cursor{color:#00ff78;animation:hm-cursor 0.8s step-end infinite;font-size:13px}
+
+        /* CONTENT */
+        .hm-content{
+          position:relative;z-index:10;
+          display:flex;flex-direction:column;align-items:center;text-align:center;
+          padding:32px 20px 80px;
+          max-width:960px;width:100%;margin:0 auto;flex:1;justify-content:center;gap:0;
+        }
+
+        /* Badge */
+        .hm-badge{
+          display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+          border:1px solid rgba(0,255,120,0.2);background:rgba(0,255,120,0.03);
+          padding:6px 16px;margin-bottom:28px;
+        }
+        .hm-badge-dot{width:6px;height:6px;border-radius:50%;background:#00ff78;display:inline-block;animation:hm-dot 1.8s ease-in-out infinite}
+        .hm-badge-txt{font-size:8px;letter-spacing:2.5px;color:rgba(0,255,120,0.7);text-transform:uppercase}
+        .hm-badge-sep{width:1px;height:11px;background:rgba(0,255,120,0.25)}
+
+        /* Title */
+        .hm-title-block{position:relative;margin-bottom:24px}
+        .hm-deco-row{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
+        .hm-deco-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,0.45));max-width:100px}
+        .hm-deco-sq{width:7px;height:7px;background:#00ff78;transform:rotate(45deg);box-shadow:0 0 10px #00ff78}
+        .hm-deco-line-b{background:linear-gradient(90deg,transparent,rgba(0,200,255,0.4))}
+        .hm-deco-sq-b{background:#00c8ff;box-shadow:0 0 10px #00c8ff}
+        .hm-title-row1{position:relative;display:block;line-height:1;margin-bottom:2px}
+        .hm-h1{
+          font-family:'Orbitron',sans-serif;font-weight:900;
+          font-size:clamp(28px,10vw,110px);
+          letter-spacing:clamp(3px,2vw,12px);line-height:1;
+          color:#fff;position:relative;z-index:1;display:block;
+        }
+        .hm-glitch{position:absolute;top:0;left:0;right:0;font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(28px,10vw,110px);letter-spacing:clamp(3px,2vw,12px);pointer-events:none;user-select:none}
+        .hm-glitch-r{color:rgba(255,0,80,0.5);transform:translate(3px,-2px);clip-path:inset(30% 0 40% 0)}
+        .hm-glitch-b{color:rgba(0,220,255,0.5);transform:translate(-3px,2px);clip-path:inset(60% 0 10% 0)}
+        .hm-title-row2{display:flex;align-items:center;justify-content:center;gap:2px}
+        .hm-h2{
+          font-family:'Orbitron',sans-serif;font-weight:900;
+          font-size:clamp(28px,10vw,110px);
+          letter-spacing:clamp(3px,2vw,12px);line-height:1;
+          background:linear-gradient(100deg,#00ff78 0%,#00ffcc 40%,#00c8ff 100%);
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+          filter:drop-shadow(0 0 40px rgba(0,255,120,0.6));
+        }
+        .hm-cursor-blink{font-family:'Share Tech Mono',monospace;font-size:clamp(28px,10vw,110px);color:#00ff78;line-height:1;animation:hm-blink 1s step-end infinite;margin-left:-2px}
+
+        /* Tagline */
+        .hm-tagline{
+          font-family:'Rajdhani',sans-serif;font-weight:300;
+          font-size:clamp(14px,2.5vw,17px);
+          color:rgba(255,255,255,0.32);line-height:1.9;
+          max-width:480px;margin:20px 0 36px;padding:0 8px;
+        }
+        .hm-br-desktop{display:none}
+        @media(min-width:600px){.hm-br-desktop{display:block}}
+
+        /* Stats */
+        .hm-stats{
+          display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+          width:100%;max-width:640px;margin-bottom:40px;
+        }
+        @media(max-width:440px){.hm-stats{grid-template-columns:1fr;max-width:300px}}
+        .hm-stat-card{
+          padding:16px 14px 13px;
+          border:1px solid rgba(0,255,120,0.09);background:rgba(0,0,0,0.5);
+          backdrop-filter:blur(12px);text-align:left;position:relative;overflow:hidden;
+          transition:border-color 0.3s;
+        }
+        .hm-stat-card:hover{border-color:rgba(0,255,120,0.28)}
+        .hm-stat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+        .hm-stat-icon{font-size:11px;color:rgba(0,255,120,0.3);margin-top:4px}
+        .hm-stat-val{font-family:'Orbitron',sans-serif;font-size:clamp(20px,4vw,32px);font-weight:700;color:#00ff78;line-height:1;text-shadow:0 0 20px rgba(0,255,120,0.4)}
+        .hm-stat-label{font-family:'Rajdhani',sans-serif;font-size:9px;color:rgba(255,255,255,0.22);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:2px;display:block}
+        .hm-stat-sub{font-size:9px;color:rgba(255,255,255,0.14);letter-spacing:0.8px;margin-bottom:12px;display:block}
+        .hm-stat-bar{height:2px;background:rgba(0,255,120,0.06);overflow:hidden}
+        .hm-stat-bar-fill{height:100%;background:linear-gradient(90deg,#00ff78,#00c8ff);transition:width 1.8s cubic-bezier(0.4,0,0.2,1)}
+        .hm-card-tr{position:absolute;top:0;right:0;width:0;height:0;border-style:solid;border-width:0 18px 18px 0;border-color:transparent rgba(0,255,120,0.1) transparent transparent}
+        .hm-card-bl{position:absolute;bottom:0;left:0;width:0;height:0;border-style:solid;border-width:18px 0 0 18px;border-color:transparent transparent transparent rgba(0,255,120,0.07)}
+
+        /* CTA */
+        .hm-cta{display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:480px}
+        .hm-btn{
+          position:relative;cursor:pointer;outline:none;
+          border:1px solid rgba(0,255,120,0.3);background:rgba(0,0,0,0.65);
+          color:#00ff78;font-family:'Orbitron',sans-serif;
+          font-size:clamp(9px,2.5vw,11px);font-weight:700;
+          padding:18px 24px;width:100%;
+          transition:all 0.35s cubic-bezier(0.4,0,0.2,1);
+          overflow:hidden;letter-spacing:clamp(2px,1vw,4px);
+          clip-path:polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);
+          -webkit-tap-highlight-color:transparent;
+        }
+        .hm-btn-hover,.hm-btn:hover{
+          background:rgba(0,255,120,0.09);border-color:rgba(0,255,120,0.65);
+          box-shadow:0 0 60px rgba(0,255,120,0.35),0 0 100px rgba(0,255,120,0.1),inset 0 0 40px rgba(0,255,120,0.04);
+          animation:hm-glow 1.2s ease-in-out infinite;
+        }
+        .hm-btn-inner{display:flex;align-items:center;justify-content:center;gap:12px;position:relative;z-index:1}
+        .hm-cta-note{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,0.15);flex-wrap:wrap;justify-content:center}
+        .hm-note-sep{color:rgba(0,255,120,0.25)}
+
+        /* Bottom bar */
+        .hm-btm{
+          position:fixed;bottom:0;left:0;right:0;z-index:40;
+          height:32px;display:flex;align-items:center;justify-content:space-between;
+          padding:0 16px;border-top:1px solid rgba(0,255,120,0.07);
+          background:rgba(0,0,0,0.8);backdrop-filter:blur(20px);
+        }
+        .hm-btm-l{display:flex;align-items:center;gap:10px}
+        .hm-btm-item{font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,0.2);text-transform:uppercase;white-space:nowrap}
+        .hm-btm-sep{width:1px;height:12px;background:rgba(0,255,120,0.15)}
+        .hm-btm-copy{font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,0.15)}
+        @media(max-width:480px){
+          .hm-btm-model{display:none}
+          .hm-btm-sep-model{display:none}
+        }
+      `}</style>
     </div>
   );
 }
-
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  @keyframes blinkCursor  { 0%,49%{opacity:1} 50%,100%{opacity:0} }
-  @keyframes pdot         { 0%,100%{box-shadow:0 0 5px #00ff78,0 0 14px #00ff78;transform:scale(1)}50%{box-shadow:0 0 10px #00ff78,0 0 28px #00ff78,0 0 50px rgba(0,255,120,0.3);transform:scale(1.4)} }
-  @keyframes shimmer      { 0%{left:-100%}100%{left:230%} }
-  @keyframes noise        { 0%,100%{background-position:0 0}10%{background-position:-5% -10%}30%{background-position:7% -25%}50%{background-position:-15% 10%}70%{background-position:0 15%}90%{background-position:-10% 10%} }
-  @keyframes scanMove     { 0%{opacity:0} 5%{opacity:1} 90%{opacity:0.8} 100%{opacity:0} }
-  @keyframes rippleAnim   { 0%{transform:translate(-50%,-50%) scale(0);opacity:0.5} 100%{transform:translate(-50%,-50%) scale(8);opacity:0} }
-  @keyframes termBlink    { 0%,100%{opacity:1}50%{opacity:0} }
-  @keyframes fadeSlideUp  { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes glowPulse    { 0%,100%{box-shadow:0 0 40px rgba(0,255,120,0.2),0 0 80px rgba(0,255,120,0.08)} 50%{box-shadow:0 0 80px rgba(0,255,120,0.5),0 0 160px rgba(0,255,120,0.2)} }
-  @keyframes ringExpand   { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.5} 100%{transform:translate(-50%,-50%) scale(2.5);opacity:0} }
-`;
-
-const R = {
-  root: { minHeight: "100vh", position: "relative", overflow: "hidden", background: "radial-gradient(ellipse at 20% 40%, #031410 0%, #010c0a 30%, #010608 60%, #000408 100%)", fontFamily: "'Share Tech Mono', monospace", display: "flex", flexDirection: "column", alignItems: "stretch", color: "#fff", cursor: "crosshair" },
-  canvas: { position: "fixed", inset: 0, zIndex: 0 },
-  vignette: { position: "fixed", inset: 0, zIndex: 2, pointerEvents: "none", background: "radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.88) 100%)" },
-  noise: { position: "fixed", inset: 0, zIndex: 3, opacity: 0.028, pointerEvents: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "160px 160px", animation: "noise 0.35s steps(1) infinite" },
-  scanline: { position: "fixed", left: 0, right: 0, height: 2, zIndex: 20, pointerEvents: "none", background: "linear-gradient(90deg, transparent 0%, rgba(0,255,120,0.03) 10%, rgba(0,255,120,0.5) 50%, rgba(0,255,120,0.03) 90%, transparent 100%)", boxShadow: "0 0 20px rgba(0,255,120,0.35)", transition: "top 0.016s linear" },
-  ripple: { position: "fixed", zIndex: 50, pointerEvents: "none", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(0,255,120,0.6)", animation: "rippleAnim 1.4s ease-out forwards" },
-
-  vizStrip: { position: "fixed", top: 62, right: 32, zIndex: 40, display: "flex", alignItems: "center", gap: 10, padding: "4px 12px", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(10px)", border: "1px solid rgba(0,255,120,0.1)", borderTop: "none" },
-  viz: { display: "flex", alignItems: "flex-end", gap: 2, height: 20 },
-  vizBar: { width: 3, borderRadius: "1px 1px 0 0", minHeight: 3, transition: "height 0.08s ease" },
-  vizSep: { width: 1, height: 12, background: "rgba(0,255,120,0.15)" },
-  vizLive: { fontSize: 8, letterSpacing: "2.5px", color: "rgba(0,255,120,0.5)" },
-
-  terminalWrap: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 10 },
-  terminal: { position: "relative", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(16px)", border: "1px solid rgba(0,255,120,0.2)", borderRadius: 8, overflow: "hidden", width: 520, maxWidth: "90vw", boxShadow: "0 0 80px rgba(0,255,120,0.08), 0 40px 80px rgba(0,0,0,0.6)" },
-  termHeader: { display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", borderBottom: "1px solid rgba(0,255,120,0.1)", background: "rgba(0,255,120,0.03)" },
-  termDot: { width: 12, height: 12, borderRadius: "50%" },
-  termTitle: { fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: "1px", marginLeft: 6 },
-  termBody: { padding: "20px 24px 24px", minHeight: 160 },
-  termLine: { fontSize: 12, lineHeight: 2, letterSpacing: "0.5px", fontFamily: "'Share Tech Mono', monospace" },
-  termCursor: { display: "inline-block", color: "#00ff78", animation: "termBlink 0.8s step-end infinite", fontSize: 14 },
-
-  content: { position: "relative", zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "48px 48px 64px", maxWidth: 980, width: "100%", margin: "0 auto", flex: 1, justifyContent: "center" },
-
-  sideL: { position: "absolute", left: -120, top: "50%", transform: "translateY(-50%) rotate(-90deg)", display: "flex", alignItems: "center", gap: 10, whiteSpace: "nowrap" },
-  sideR: { left: "auto", right: -120, transform: "translateY(-50%) rotate(90deg)" },
-  sideRule: { width: 36, height: 1, background: "linear-gradient(90deg, transparent, rgba(0,255,120,0.25))" },
-  sideTxt: { fontSize: 8, letterSpacing: "3px", color: "rgba(0,255,120,0.25)", textTransform: "uppercase" },
-
-  badge: { display: "inline-flex", alignItems: "center", gap: 12, border: "1px solid rgba(0,255,120,0.18)", background: "rgba(0,255,120,0.03)", backdropFilter: "blur(10px)", padding: "7px 20px", marginBottom: 40, animation: "fadeSlideUp 0.8s ease both", animationDelay: "0.1s" },
-  badgePulse: { width: 6, height: 6, borderRadius: "50%", background: "#00ff78", display: "inline-block", animation: "pdot 1.8s ease-in-out infinite" },
-  badgeTxt: { fontSize: 8.5, letterSpacing: "3px", color: "rgba(0,255,120,0.7)", textTransform: "uppercase" },
-  badgeDivider: { width: 1, height: 12, background: "rgba(0,255,120,0.2)" },
-
-  titleBlock: { position: "relative", marginBottom: 32, animation: "fadeSlideUp 1s ease both", animationDelay: "0.25s" },
-  titleTopDeco: { display: "flex", alignItems: "center", gap: 12, justifyContent: "center", marginBottom: 6 },
-  decoLine: { flex: 1, height: 1, background: "linear-gradient(90deg, transparent, rgba(0,255,120,0.45))", maxWidth: 120 },
-  decoSquare: { width: 7, height: 7, background: "#00ff78", transform: "rotate(45deg)", boxShadow: "0 0 12px #00ff78" },
-  titleRow1: { position: "relative", display: "block", lineHeight: 1, marginBottom: 4 },
-  h1: { fontFamily: "'Orbitron', sans-serif", fontSize: "clamp(48px, 9vw, 112px)", fontWeight: 900, color: "#fff", letterSpacing: "12px", lineHeight: 1, textShadow: "0 0 100px rgba(255,255,255,0.06), 0 0 40px rgba(255,255,255,0.04)", position: "relative", zIndex: 1, display: "block" },
-  glitchLayer: { position: "absolute", top: 0, fontFamily: "'Orbitron', sans-serif", fontSize: "clamp(48px, 9vw, 112px)", fontWeight: 900, letterSpacing: "12px", lineHeight: 1, display: "block", pointerEvents: "none", userSelect: "none" },
-  titleRow2: { display: "flex", alignItems: "center", justifyContent: "center", gap: 4 },
-  h2: { fontFamily: "'Orbitron', sans-serif", fontSize: "clamp(48px, 9vw, 112px)", fontWeight: 900, letterSpacing: "12px", lineHeight: 1, background: "linear-gradient(100deg, #00ff78 0%, #00ffcc 35%, #00e5ff 65%, #00c8ff 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", filter: "drop-shadow(0 0 50px rgba(0,255,120,0.65))" },
-  blinkCursor: { fontFamily: "'Share Tech Mono', monospace", fontSize: "clamp(48px, 9vw, 112px)", color: "#00ff78", lineHeight: 1, animation: "blinkCursor 1s step-end infinite", marginLeft: -4 },
-
-  circuitArmL: { position: "absolute", left: -100, top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 },
-  circuitArmR: { left: "auto", right: -100, alignItems: "flex-start" },
-  cNode: { width: 6, height: 6, borderRadius: "50%", background: "#00ff78", boxShadow: "0 0 8px #00ff78", flexShrink: 0 },
-  cLine: { height: 1, background: "linear-gradient(90deg, rgba(0,255,120,0.5), rgba(0,255,120,0.1))" },
-
-  tagline: { fontFamily: "'Rajdhani', sans-serif", fontWeight: 300, fontSize: 17, color: "rgba(255,255,255,0.33)", lineHeight: 1.95, letterSpacing: "0.6px", maxWidth: 520, marginBottom: 52, animation: "fadeSlideUp 1s ease both", animationDelay: "0.5s" },
-
-  statsRow: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, width: "100%", maxWidth: 700, marginBottom: 56, animation: "fadeSlideUp 1s ease both", animationDelay: "0.65s" },
-  statCard: { padding: "22px 20px 16px", border: "1px solid rgba(0,255,120,0.08)", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(12px)", textAlign: "left", position: "relative", overflow: "hidden", transition: "border-color 0.3s ease, box-shadow 0.3s ease" },
-  statCardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
-  statIcon: { fontSize: 13, color: "rgba(0,255,120,0.3)", marginTop: 6 },
-  statVal: { fontFamily: "'Orbitron', sans-serif", fontSize: 34, fontWeight: 700, color: "#00ff78", display: "block", lineHeight: 1 },
-  statLabel: { fontFamily: "'Rajdhani', sans-serif", fontSize: 10, color: "rgba(255,255,255,0.25)", letterSpacing: "2.5px", textTransform: "uppercase", marginBottom: 2, display: "block" },
-  statSub: { fontSize: 9, color: "rgba(255,255,255,0.15)", letterSpacing: "1px", marginBottom: 14, display: "block" },
-  statBarTrack: { height: 2, background: "rgba(0,255,120,0.06)", overflow: "hidden" },
-  statBarFill: { height: "100%", background: "linear-gradient(90deg, #00ff78, #00c8ff)", transition: "width 1.8s cubic-bezier(0.4,0,0.2,1)", boxShadow: "0 0 10px rgba(0,255,120,0.5)" },
-  cardCornerTR: { position: "absolute", top: 0, right: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: "0 20px 20px 0", borderColor: "transparent rgba(0,255,120,0.12) transparent transparent" },
-  cardCornerBL: { position: "absolute", bottom: 0, left: 0, width: 0, height: 0, borderStyle: "solid", borderWidth: "20px 0 0 20px", borderColor: "transparent transparent transparent rgba(0,255,120,0.08)" },
-
-  ctaWrap: { display: "flex", flexDirection: "column", alignItems: "center", gap: 20, position: "relative", animation: "fadeSlideUp 1s ease both", animationDelay: "0.85s" },
-  ctaRing: { position: "absolute", top: "50%", left: "50%", width: 400, height: 80, borderRadius: "50%", border: "1px solid rgba(0,255,120,0.25)", animation: "ringExpand 1.5s ease-in-out infinite", pointerEvents: "none" },
-  btn: { position: "relative", cursor: "pointer", outline: "none", border: "1px solid rgba(0,255,120,0.28)", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(16px)", color: "#00ff78", fontFamily: "'Orbitron', sans-serif", fontSize: 12, fontWeight: 700, padding: "22px 80px", transition: "all 0.4s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden", clipPath: "polygon(20px 0%, 100% 0%, calc(100% - 20px) 100%, 0% 100%)" },
-  btnHover: { background: "rgba(0,255,120,0.08)", borderColor: "rgba(0,255,120,0.7)", boxShadow: "0 0 80px rgba(0,255,120,0.4), 0 0 160px rgba(0,255,120,0.15), inset 0 0 60px rgba(0,255,120,0.05)", animation: "glowPulse 1.2s ease-in-out infinite" },
-  btnCorner: { position: "absolute", width: 14, height: 14, borderColor: "#00ff78", borderStyle: "solid", transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease", pointerEvents: "none" },
-  btnShine: { position: "absolute", top: 0, left: "-100%", width: "50%", height: "100%", background: "linear-gradient(105deg, transparent 38%, rgba(0,255,120,0.12) 50%, rgba(0,255,200,0.06) 55%, transparent 62%)", animation: "shimmer 0.6s ease forwards", pointerEvents: "none" },
-  btnContent: { display: "flex", alignItems: "center", justifyContent: "center", gap: 20, position: "relative", zIndex: 1 },
-  btnHexL: { display: "flex", alignItems: "center", opacity: 0.7 },
-  ctaNote: { display: "flex", alignItems: "center", gap: 10, fontSize: 9, letterSpacing: "1.5px", color: "rgba(255,255,255,0.15)" },
-  ctaNoteItem: {},
-  ctaNoteSep: { color: "rgba(0,255,120,0.25)" },
-
-  btmBar: { position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, height: 34, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderTop: "1px solid rgba(0,255,120,0.07)", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(20px)" },
-  btmBarL: { display: "flex", alignItems: "center", gap: 14 },
-  btmBarR: {},
-  btmSep: { width: 1, height: 14, background: "rgba(0,255,120,0.15)" },
-  btmItem: { fontSize: 8.5, letterSpacing: "2px", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" },
-};
