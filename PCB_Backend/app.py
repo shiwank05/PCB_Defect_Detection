@@ -12,7 +12,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'best.pt')
 
 app = Flask(__name__)
-CORS(app, origins="*")
+
+# ✅ Fixed CORS — allows all origins including Vercel and localhost
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 # ── Load model at startup ──────────────────────────────────────
 print(f"[INFO] Loading model from: {MODEL_PATH}")
@@ -45,13 +47,27 @@ ICONS = {
 }
 
 # ── Routes ────────────────────────────────────────────────────
+
+# ✅ Handle preflight OPTIONS requests for CORS
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'online', 'model': 'YOLOv8m'}), 200
 
 
-@app.route('/detect', methods=['POST'])
+@app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
+    # Handle preflight
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
     if 'image' not in request.files:
         return jsonify({'error': 'No image provided'}), 400
 
@@ -110,9 +126,9 @@ def detect():
     )
     affected_pct = round((total_box_area / img_area) * 100, 1) if img_area > 0 else 0
 
-    is_defect   = len(detections) > 0
-    top_conf    = round(max((d['confidence'] for d in detections), default=97))
-    board_id    = f"PCB-{np.random.randint(100000, 999999)}"
+    is_defect = len(detections) > 0
+    top_conf  = round(max((d['confidence'] for d in detections), default=97))
+    board_id  = f"PCB-{np.random.randint(100000, 999999)}"
 
     return jsonify({
         'result':       'defect' if is_defect else 'pass',
