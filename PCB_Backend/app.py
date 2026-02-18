@@ -2,8 +2,7 @@ import os
 import io
 import time
 import numpy as np
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, make_response
 from ultralytics import YOLO
 from PIL import Image
 
@@ -12,10 +11,8 @@ BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'best.pt')
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
-# ✅ Lazy loading — model loads on first request, NOT at startup
-# This lets gunicorn bind to the port immediately so Render doesn't time out
+# ── Lazy model loading ─────────────────────────────────────────
 model = None
 
 def get_model():
@@ -26,13 +23,13 @@ def get_model():
         print("[INFO] ✅ Model loaded successfully")
     return model
 
-# ── CORS headers on every response ────────────────────────────
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    return response
+# ── CORS — manually added to every response ───────────────────
+def cors(response, status=200):
+    r = make_response(response, status)
+    r.headers['Access-Control-Allow-Origin']  = '*'
+    r.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    r.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return r
 
 # ── Constants ─────────────────────────────────────────────────
 CLASS_NAMES = {
@@ -54,18 +51,21 @@ ICONS = {
 }
 
 # ── Routes ────────────────────────────────────────────────────
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
-    return jsonify({'status': 'online', 'model': 'YOLOv8m'}), 200
+    if request.method == 'OPTIONS':
+        return cors(jsonify({}))
+    return cors(jsonify({'status': 'online', 'model': 'YOLOv8m'}))
 
 
 @app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
+    # Handle preflight
     if request.method == 'OPTIONS':
-        return jsonify({}), 200
+        return cors(jsonify({}))
 
     if 'image' not in request.files:
-        return jsonify({'error': 'No image provided'}), 400
+        return cors(jsonify({'error': 'No image provided'}), 400)
 
     file = request.files['image']
 
@@ -73,14 +73,14 @@ def detect():
         img_bytes = file.read()
         img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
     except Exception as e:
-        return jsonify({'error': f'Invalid image: {str(e)}'}), 400
+        return cors(jsonify({'error': f'Invalid image: {str(e)}'}), 400)
 
     try:
         start     = time.time()
         results   = get_model()(img, conf=0.25)[0]
         scan_time = round(time.time() - start, 2)
     except Exception as e:
-        return jsonify({'error': f'Model inference failed: {str(e)}'}), 500
+        return cors(jsonify({'error': f'Model inference failed: {str(e)}'}), 500)
 
     # ── Parse detections ──────────────────────────────────────
     detections = []
@@ -126,7 +126,7 @@ def detect():
     top_conf  = round(max((d['confidence'] for d in detections), default=97))
     board_id  = f"PCB-{np.random.randint(100000, 999999)}"
 
-    return jsonify({
+    return cors(jsonify({
         'result':       'defect' if is_defect else 'pass',
         'confidence':   top_conf,
         'scanTime':     scan_time,
@@ -137,7 +137,7 @@ def detect():
         'analysis':     analysis,
         'detections':   detections,
         'imageSize':    {'width': img.width, 'height': img.height}
-    }), 200
+    }))
 
 
 # ── Entry point ───────────────────────────────────────────────
