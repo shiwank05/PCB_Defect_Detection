@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 
-// ✅ Production backend
-const API_URL = "https://pcb-defect-detection-pour.onrender.com";
+// ✅ Local backend
+const API_URL = "https://pcb-backend-66ya.onrender.com";
 
 export default function Detect() {
   const [image, setImage] = useState(null);
@@ -72,7 +72,6 @@ export default function Detect() {
       const formData = new FormData();
       formData.append("image", image);
 
-      // ✅ Production URL
       const response = await fetch(`${API_URL}/detect`, {
         method: "POST",
         body: formData,
@@ -100,7 +99,6 @@ export default function Detect() {
       clearInterval(pi);
       setLoading(false);
       setLoadPct(0);
-      // ✅ Production-aware error message
       setError(
         err.message.includes("fetch")
           ? "Cannot connect to backend. The server may be waking up — please wait 30 seconds and try again."
