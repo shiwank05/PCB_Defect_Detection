@@ -7,25 +7,32 @@ from flask_cors import CORS
 from ultralytics import YOLO
 from PIL import Image
 
-# ── Path fix: find best.pt relative to this file ──────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ── Path fix ──────────────────────────────────────────────────
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'best.pt')
 
 app = Flask(__name__)
-
-# ✅ Fixed CORS — allows all origins including Vercel and localhost
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
-# ── Load model at startup ──────────────────────────────────────
-print(f"[INFO] Loading model from: {MODEL_PATH}")
-print(f"[INFO] model exists: {os.path.exists(MODEL_PATH)}")
-print(f"[INFO] Files in BASE_DIR: {os.listdir(BASE_DIR)}")
+# ✅ Lazy loading — model loads on first request, NOT at startup
+# This lets gunicorn bind to the port immediately so Render doesn't time out
+model = None
 
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(f"best.pt not found at {MODEL_PATH}")
+def get_model():
+    global model
+    if model is None:
+        print("[INFO] Loading YOLOv8m model...")
+        model = YOLO(MODEL_PATH)
+        print("[INFO] ✅ Model loaded successfully")
+    return model
 
-model = YOLO(MODEL_PATH)
-print("[INFO] ✅ Model loaded successfully")
+# ── CORS headers on every response ────────────────────────────
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 # ── Constants ─────────────────────────────────────────────────
 CLASS_NAMES = {
@@ -47,16 +54,6 @@ ICONS = {
 }
 
 # ── Routes ────────────────────────────────────────────────────
-
-# ✅ Handle preflight OPTIONS requests for CORS
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    return response
-
-
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'online', 'model': 'YOLOv8m'}), 200
@@ -64,7 +61,6 @@ def health():
 
 @app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
-    # Handle preflight
     if request.method == 'OPTIONS':
         return jsonify({}), 200
 
@@ -80,8 +76,8 @@ def detect():
         return jsonify({'error': f'Invalid image: {str(e)}'}), 400
 
     try:
-        start = time.time()
-        results = model(img, conf=0.25)[0]
+        start     = time.time()
+        results   = get_model()(img, conf=0.25)[0]
         scan_time = round(time.time() - start, 2)
     except Exception as e:
         return jsonify({'error': f'Model inference failed: {str(e)}'}), 500
@@ -102,7 +98,7 @@ def detect():
             }
         })
 
-    # ── Build analysis bars (one per unique defect class) ─────
+    # ── Build analysis bars ───────────────────────────────────
     analysis = []
     seen = set()
     for d in detections:
