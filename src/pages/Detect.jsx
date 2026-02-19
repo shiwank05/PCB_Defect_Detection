@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 
 // ✅ Local backend
-const API_URL = "http://127.0.0.1:10000";
+const API_URL = "https://shiwank05-pcb-defect-backend.hf.space";
 
 export default function Detect() {
   const [image, setImage] = useState(null);

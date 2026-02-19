@@ -5,11 +5,20 @@ import numpy as np
 from flask import Flask, request, jsonify, make_response
 from ultralytics import YOLO
 from PIL import Image
+from huggingface_hub import hf_hub_download
 
-# ── Path fix ──────────────────────────────────────────────────
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'best.pt')
+# ── Download model from Hugging Face Hub ──────────────────────
+HF_REPO_ID  = "shiwank05/pcb-defect-model"  
+HF_FILENAME = "best.pt"                         
 
+print("[INFO] Downloading model from Hugging Face Hub...")
+MODEL_PATH = hf_hub_download(
+    repo_id=HF_REPO_ID,
+    filename=HF_FILENAME
+)
+print(f"[INFO] ✅ Model downloaded to: {MODEL_PATH}")
+
+# ── Flask App ─────────────────────────────────────────────────
 app = Flask(__name__)
 
 # ── Lazy model loading ─────────────────────────────────────────
@@ -23,7 +32,7 @@ def get_model():
         print("[INFO] ✅ Model loaded successfully")
     return model
 
-# ── CORS — manually added to every response ───────────────────
+# ── CORS helper ───────────────────────────────────────────────
 def cors(response, status=200):
     r = make_response(response, status)
     r.headers['Access-Control-Allow-Origin']  = '*'
@@ -51,30 +60,52 @@ ICONS = {
 }
 
 # ── Routes ────────────────────────────────────────────────────
+
+@app.route('/', methods=['GET'])
+def index():
+    return cors(jsonify({
+        'message': 'PCB Defect Detection API is running!',
+        'endpoints': {
+            'health': '/health',
+            'detect': '/detect  [POST]'
+        }
+    }))
+
+
 @app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
     if request.method == 'OPTIONS':
         return cors(jsonify({}))
-    return cors(jsonify({'status': 'online', 'model': 'YOLOv8m'}))
+    return cors(jsonify({
+        'status': 'online',
+        'model':  'YOLOv8m',
+        'repo':   HF_REPO_ID
+    }))
 
 
 @app.route('/detect', methods=['POST', 'OPTIONS'])
 def detect():
-    # Handle preflight
+    # ── Preflight ─────────────────────────────────────────────
     if request.method == 'OPTIONS':
         return cors(jsonify({}))
 
+    # ── Validate input ────────────────────────────────────────
     if 'image' not in request.files:
-        return cors(jsonify({'error': 'No image provided'}), 400)
+        return cors(jsonify({'error': 'No image provided. Send image as multipart/form-data with key "image"'}), 400)
 
     file = request.files['image']
 
+    if file.filename == '':
+        return cors(jsonify({'error': 'Empty filename. Please select a valid image file.'}), 400)
+
+    # ── Read & open image ─────────────────────────────────────
     try:
         img_bytes = file.read()
         img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
     except Exception as e:
         return cors(jsonify({'error': f'Invalid image: {str(e)}'}), 400)
 
+    # ── Run inference ─────────────────────────────────────────
     try:
         start     = time.time()
         results   = get_model()(img, conf=0.25)[0]
@@ -122,8 +153,9 @@ def detect():
     )
     affected_pct = round((total_box_area / img_area) * 100, 1) if img_area > 0 else 0
 
+    # ── Summary ───────────────────────────────────────────────
     is_defect = len(detections) > 0
-    top_conf  = round(max((d['confidence'] for d in detections), default=97))
+    top_conf  = round(max((d['confidence'] for d in detections), default=0))
     board_id  = f"PCB-{np.random.randint(100000, 999999)}"
 
     return cors(jsonify({
@@ -142,5 +174,5 @@ def detect():
 
 # ── Entry point ───────────────────────────────────────────────
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 7860))  # HF Spaces uses 7860
     app.run(host='0.0.0.0', port=port, debug=False)
