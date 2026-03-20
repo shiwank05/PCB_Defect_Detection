@@ -72,8 +72,12 @@ export default function Detect() {
       const formData = new FormData();
       formData.append("image", image);
 
+      const token = localStorage.getItem("pcb_token");
       const response = await fetch(`${API_URL}/detect`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
