@@ -2,7 +2,10 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { API_URL } from "../config";
-import { Alert, Badge, Button, Card, CardHeader, Container, Meter, PageHeader } from "../components/ui";
+import {
+  Alert, Badge, Button, Card, CardHeader, Container, Icon, IconBadge, Meter, PageHeader,
+  Skeleton, Spinner,
+} from "../components/ui";
 
 const steps = [
   { label: "Preprocessing image", sub: "Normalizing pixel data" },
@@ -12,17 +15,22 @@ const steps = [
 ];
 
 const TIPS = [
-  { title: "High resolution", text: "512×512 px or larger is recommended." },
-  { title: "Clear focus", text: "Sharp edges make small defects easier to find." },
-  { title: "Even lighting", text: "Avoid glare and overexposed areas." },
+  { icon: "image", title: "High resolution", text: "512×512 px or larger is recommended." },
+  { icon: "target", title: "Clear focus", text: "Sharp edges make small defects easier to find." },
+  { icon: "zap", title: "Even lighting", text: "Avoid glare and overexposed areas." },
 ];
 
 const MODEL_INFO = [
   ["Model", "YOLOv8m"],
   ["mAP@0.5", "93.6%"],
   ["Defect classes", "6"],
-  ["Inference", "~14 ms / image"],
 ];
+
+function formatSize(bytes) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${(bytes / 1024).toFixed(1)} KB`;
+}
 
 export default function Detect() {
   const [image, setImage] = useState(null);
@@ -113,7 +121,7 @@ export default function Detect() {
   };
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="min-h-screen">
       <Navbar />
 
       <main>
@@ -123,7 +131,7 @@ export default function Detect() {
             subtitle="Upload a PCB image and the YOLOv8m model will check it for manufacturing defects."
           />
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="animate-enter grid gap-6 lg:grid-cols-3" style={{ animationDelay: "80ms" }}>
             {/* Upload column */}
             <div className="space-y-4 lg:col-span-2">
               <Card>
@@ -131,21 +139,38 @@ export default function Detect() {
                 <div className="p-5">
                   {preview ? (
                     <div>
-                      <div className="overflow-hidden rounded-lg border border-line bg-page">
+                      <div className="relative overflow-hidden rounded-lg border border-line bg-page">
                         <img
                           src={preview}
                           alt="Selected PCB preview"
-                          className="mx-auto max-h-[420px] w-auto object-contain"
+                          className={`mx-auto max-h-[420px] w-auto object-contain transition duration-300 ${
+                            loading ? "opacity-60" : ""
+                          }`}
                         />
+                        {loading && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="rounded-full bg-white/90 px-4 py-2 shadow-raise">
+                              <Spinner label="Analyzing…" />
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-4 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
+
+                      {/* File row: thumbnail, name, size */}
+                      <div className="mt-4 flex items-center gap-3 rounded-lg border border-line bg-page p-3">
+                        <img
+                          src={preview}
+                          alt=""
+                          className="h-12 w-12 flex-none rounded-md border border-line object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-ink">{image?.name}</p>
                           <p className="text-sm text-muted">
-                            {(image?.size / 1024).toFixed(1)} KB · {image?.type?.split("/")[1]?.toUpperCase()}
+                            {formatSize(image?.size)} · {image?.type?.split("/")[1]?.toUpperCase()}
                           </p>
                         </div>
                         <Button variant="secondary" size="sm" onClick={clearImage} disabled={loading}>
+                          <Icon name="x" className="h-4 w-4" />
                           Remove
                         </Button>
                       </div>
@@ -155,10 +180,10 @@ export default function Detect() {
                       role="button"
                       tabIndex={0}
                       aria-label="Upload a PCB image"
-                      className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-14 text-center transition-colors duration-150 ${
+                      className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-14 text-center transition duration-200 ${
                         dragging
                           ? "border-primary bg-primary-soft"
-                          : "border-line-strong bg-page hover:border-primary hover:bg-primary-soft"
+                          : "border-line-strong bg-page hover:border-primary hover:bg-primary-soft/60"
                       }`}
                       onClick={() => fileRef.current.click()}
                       onKeyDown={e => {
@@ -171,13 +196,21 @@ export default function Detect() {
                       onDragLeave={() => setDragging(false)}
                       onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
                     >
-                      <svg className="h-10 w-10 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
-                      </svg>
-                      <p className="mt-3 text-sm font-medium text-ink">
-                        Drag and drop an image, or <span className="text-primary">browse files</span>
+                      <span
+                        className={`flex h-14 w-14 items-center justify-center rounded-full transition duration-200 ${
+                          dragging
+                            ? "bg-primary text-white"
+                            : "bg-primary-soft text-primary motion-safe:group-hover:-translate-y-0.5"
+                        }`}
+                      >
+                        <Icon name="upload" className="h-6 w-6" />
+                      </span>
+                      <p className="mt-4 text-base font-medium text-ink">
+                        {dragging ? "Drop to upload" : "Drag and drop an image"}
                       </p>
-                      <p className="mt-1 text-sm text-muted">One image at a time</p>
+                      <p className="mt-1 text-sm text-muted">
+                        or <span className="font-medium text-primary">browse files</span> · one image at a time
+                      </p>
                     </div>
                   )}
 
@@ -196,8 +229,8 @@ export default function Detect() {
               {loading ? (
                 <Card className="p-5" aria-live="polite">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-ink">Analyzing image…</p>
-                    <span className="text-sm text-muted">{Math.round(loadPct)}%</span>
+                    <Spinner label="Analyzing image…" />
+                    <span className="text-sm font-medium text-ink">{Math.round(loadPct)}%</span>
                   </div>
                   <div className="mt-3">
                     <Meter value={loadPct} />
@@ -206,7 +239,7 @@ export default function Detect() {
                     {steps.map((step, i) => (
                       <li key={step.label} className="flex items-start gap-3">
                         <span
-                          className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full border text-xs ${
+                          className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full border text-xs transition-colors duration-300 ${
                             i < loadStep
                               ? "border-success bg-success text-white"
                               : i === loadStep
@@ -214,7 +247,7 @@ export default function Detect() {
                               : "border-line-strong text-muted"
                           }`}
                         >
-                          {i < loadStep ? "✓" : i + 1}
+                          {i < loadStep ? <Icon name="check" className="h-3 w-3" /> : i + 1}
                         </span>
                         <div className={i > loadStep ? "opacity-50" : ""}>
                           <p className="text-sm font-medium text-ink">{step.label}</p>
@@ -223,9 +256,20 @@ export default function Detect() {
                       </li>
                     ))}
                   </ol>
+
+                  {/* Placeholder for the report that is being prepared */}
+                  <div className="mt-6 border-t border-line pt-5">
+                    <p className="mb-3 text-xs font-medium text-muted">Preparing your report</p>
+                    <div className="space-y-3">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
+                    </div>
+                  </div>
                 </Card>
               ) : (
                 <Button size="lg" className="w-full" onClick={handleSubmit} disabled={!image}>
+                  <Icon name="target" className="h-5 w-5" />
                   Run defect analysis
                 </Button>
               )}
@@ -237,9 +281,12 @@ export default function Detect() {
                 <CardHeader title="Tips for best results" />
                 <ul className="divide-y divide-line">
                   {TIPS.map(t => (
-                    <li key={t.title} className="px-5 py-3">
-                      <p className="text-sm font-medium text-ink">{t.title}</p>
-                      <p className="text-sm text-muted">{t.text}</p>
+                    <li key={t.title} className="flex items-start gap-3 px-5 py-3">
+                      <IconBadge icon={t.icon} className="h-8 w-8" />
+                      <div>
+                        <p className="text-sm font-medium text-ink">{t.title}</p>
+                        <p className="text-sm text-muted">{t.text}</p>
+                      </div>
                     </li>
                   ))}
                 </ul>
