@@ -122,7 +122,7 @@ export default function Register() {
                 {[1, 2, 3].map(i => (
                   <span
                     key={i}
-                    className={`h-1.5 flex-1 rounded-full transition-colors duration-150 ${
+                    className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                       i <= strength ? strengthBar[strength] : "bg-line"
                     }`}
                   />

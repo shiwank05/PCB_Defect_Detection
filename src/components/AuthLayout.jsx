@@ -1,34 +1,84 @@
 import { Link } from "react-router-dom";
-import { Button, Card } from "./ui";
+import Logo from "./Logo";
+import { Button, Icon } from "./ui";
 
-/** Centered card shell shared by the Login and Register pages. */
+const BENEFITS = [
+  "Six defect types detected automatically",
+  "Defects located on your image, with confidence scores",
+  "Sign in with email or Google",
+];
+
+/** Branded side panel — hidden on mobile. */
+function BrandPanel() {
+  return (
+    <aside
+      className="relative hidden flex-col justify-between overflow-hidden bg-primary-strong p-10 text-white lg:flex"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px)",
+        backgroundSize: "32px 32px",
+      }}
+    >
+      <Link to="/" className="flex items-center gap-2.5 rounded-lg">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+          <Icon name="chip" className="h-5 w-5" />
+        </span>
+        <span className="text-lg font-semibold tracking-tight">PCB Defect Detection</span>
+      </Link>
+
+      <div>
+        <h2 className="max-w-sm text-3xl font-semibold leading-tight tracking-tight text-white">
+          Inspect circuit boards with a trained vision model.
+        </h2>
+        <p className="mt-3 max-w-sm text-primary-200">
+          Upload a board photo and see every defect found, classified and scored.
+        </p>
+        <ul className="mt-8 space-y-3">
+          {BENEFITS.map(b => (
+            <li key={b} className="flex items-start gap-3 text-sm text-white/90">
+              <span className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-white/15">
+                <Icon name="check" className="h-3 w-3" />
+              </span>
+              {b}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="text-sm text-primary-200">YOLOv8m · 6 defect classes</p>
+    </aside>
+  );
+}
+
+/** Split layout shared by the Login and Register pages. */
 export default function AuthLayout({ title, subtitle, children, footer }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-page px-4 py-10">
-      <Link to="/" className="mb-8 flex items-center gap-2.5 rounded-lg">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="6" y="6" width="12" height="12" rx="2" />
-            <path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
-          </svg>
-        </span>
-        <span className="text-lg font-semibold text-ink">PCB Defect Detection</span>
-      </Link>
+    <div className="grid min-h-screen lg:grid-cols-2">
+      <BrandPanel />
 
-      <Card className="w-full max-w-md p-6 sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
-        <div className="mt-6">{children}</div>
-      </Card>
+      <div className="flex flex-col items-center justify-center px-4 py-10">
+        <div className="mb-8 lg:hidden">
+          <Logo size="lg" />
+        </div>
 
-      {footer && <p className="mt-6 text-sm text-muted">{footer}</p>}
+        <div className="animate-enter w-full max-w-md">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h1>
+          {subtitle && <p className="mt-1.5 text-sm text-muted sm:text-base">{subtitle}</p>}
+          <div className="mt-8 rounded-xl border border-line bg-surface p-6 shadow-raise sm:p-7">
+            {children}
+          </div>
+        </div>
 
-      <Link
-        to="/"
-        className="mt-3 rounded text-sm text-muted transition-colors duration-150 hover:text-ink"
-      >
-        ← Back to home
-      </Link>
+        {footer && <p className="mt-6 text-sm text-muted">{footer}</p>}
+
+        <Link
+          to="/"
+          className="mt-3 inline-flex items-center gap-1.5 rounded text-sm text-muted transition-colors duration-150 hover:text-ink"
+        >
+          <Icon name="home" className="h-4 w-4" />
+          Back to home
+        </Link>
+      </div>
     </div>
   );
 }
