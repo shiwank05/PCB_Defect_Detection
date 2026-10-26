@@ -21,6 +21,12 @@ const LEVEL_TONE = { HIGH: "danger", MEDIUM: "warning", LOW: "neutral", EXCELLEN
 const LEVEL_METER = { HIGH: "danger", MEDIUM: "warning", LOW: "primary", EXCELLENT: "success" };
 
 // Same thresholds the backend uses to label an analysis row
+// Annotation sizes in on-screen pixels
+const LABEL_FONT = 12;
+const LABEL_PAD_X = 6;
+const LABEL_PAD_Y = 3;
+const MAX_IMG_HEIGHT = 480;
+
 const levelFor = conf => (conf > 80 ? "HIGH" : conf > 55 ? "MEDIUM" : "LOW");
 
 export default function Result() {
@@ -44,52 +50,79 @@ export default function Result() {
   const [activeTab, setActiveTab] = useState("annotated"); // "annotated" | "original"
 
   const bboxCanvasRef = useRef(null);
+  const imgRef = useRef(null);
+  const [natural, setNatural] = useState(null); // natural image size
+  const [displayW, setDisplayW] = useState(0);  // on-screen canvas width
 
-  // ── Draw real bounding boxes ─────────────────────────────────
+  // ── Load the image once; remember its natural size ───────────
   useEffect(() => {
-    if (activeTab !== "annotated" || !imageUrl || !bboxCanvasRef.current) return;
-    const canvas = bboxCanvasRef.current;
-    const ctx    = canvas.getContext("2d");
-    const img    = new Image();
-
+    if (!imageUrl) return;
+    const img = new Image();
     img.onload = () => {
-      canvas.width  = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
-
-      if (detections.length === 0) { setBboxDrawn(true); return; }
-
-      detections.forEach(det => {
-        const { x1, y1, x2, y2 } = det.bbox;
-        const w   = x2 - x1;
-        const h   = y2 - y1;
-        const col = CLASS_COLORS[det.class_name] || FALLBACK_COLOR;
-        const lbl = `${det.class_name} ${det.confidence}%`;
-
-        // Box
-        ctx.strokeStyle = col;
-        ctx.lineWidth   = Math.max(2, canvas.width / 320);
-        ctx.strokeRect(x1, y1, w, h);
-
-        // Label
-        const fontSize = Math.max(11, canvas.width / 60);
-        ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
-        const txtW = ctx.measureText(lbl).width;
-        const lblH = fontSize + 8;
-        const lblY = y1 - lblH < 0 ? y1 + 2 : y1 - lblH;
-
-        ctx.fillStyle = col;
-        ctx.fillRect(x1, lblY, txtW + 14, lblH);
-        ctx.fillStyle = "#fff";
-        ctx.fillText(lbl, x1 + 7, lblY + lblH - 6);
-      });
-
-      setBboxDrawn(true);
+      imgRef.current = img;
+      setNatural({ w: img.naturalWidth, h: img.naturalHeight });
     };
-
     img.onerror = () => { setImgFailed(true); setBboxDrawn(true); };
     img.src = imageUrl;
-  }, [activeTab, imageUrl, detections]);
+  }, [imageUrl]);
+
+  // ── Track the width the canvas is actually displayed at ──────
+  useEffect(() => {
+    const canvas = bboxCanvasRef.current;
+    if (activeTab !== "annotated" || !natural || !canvas) return;
+    const update = () => setDisplayW(canvas.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [activeTab, natural]);
+
+  // ── Draw real bounding boxes ─────────────────────────────────
+  // The canvas keeps the image's natural resolution but is shown scaled by
+  // CSS. Sizes below are given in on-screen pixels and divided by the scale,
+  // so line width, label font and padding stay constant on screen.
+  useEffect(() => {
+    const canvas = bboxCanvasRef.current;
+    const img = imgRef.current;
+    if (activeTab !== "annotated" || !natural || !displayW || !canvas || !img) return;
+    const ctx = canvas.getContext("2d");
+
+    canvas.width  = natural.w;
+    canvas.height = natural.h;
+    ctx.drawImage(img, 0, 0);
+
+    const px = natural.w / displayW; // canvas pixels per on-screen pixel
+
+    detections.forEach(det => {
+      const { x1, y1, x2, y2 } = det.bbox;
+      const col = CLASS_COLORS[det.class_name] || FALLBACK_COLOR;
+      const lbl = `${det.class_name} ${det.confidence}%`;
+      const line = 2 * px;
+
+      // Box
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = line;
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+      // Label
+      ctx.font = `600 ${LABEL_FONT * px}px Inter, system-ui, sans-serif`;
+      const lblW = ctx.measureText(lbl).width + LABEL_PAD_X * 2 * px;
+      const lblH = (LABEL_FONT + LABEL_PAD_Y * 2) * px;
+
+      // Keep the label inside the canvas: shift left past the right edge,
+      // and sit inside the box when there is no room above it.
+      const lblX = Math.max(0, Math.min(x1, natural.w - lblW));
+      const lblY = y1 - lblH < 0 ? y1 + line : y1 - lblH;
+
+      ctx.fillStyle = col;
+      ctx.fillRect(lblX, lblY, lblW, lblH);
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(lbl, lblX + LABEL_PAD_X * px, lblY + lblH / 2);
+    });
+
+    setBboxDrawn(true);
+  }, [activeTab, natural, displayW, detections]);
 
   // ── No state guard ───────────────────────────────────────────
   if (!location.state) {
@@ -109,6 +142,11 @@ export default function Result() {
       </div>
     );
   }
+
+  // Show the image at most 2x its natural width (and no taller than the cap), centered
+  const fitStyle = natural
+    ? { width: "100%", maxWidth: Math.min(natural.w * 2, (MAX_IMG_HEIGHT * natural.w) / natural.h) }
+    : undefined;
 
   const uniqueClasses = [...new Set(detections.map(d => d.class_name))];
 
@@ -256,7 +294,7 @@ export default function Result() {
                       <div className="relative overflow-hidden rounded-lg border border-line bg-page">
                         {activeTab === "annotated" ? (
                           <>
-                            <canvas ref={bboxCanvasRef} className="mx-auto block h-auto max-h-[480px] w-full object-contain" />
+                            <canvas ref={bboxCanvasRef} style={fitStyle} className="mx-auto block h-auto w-full" />
                             {!bboxDrawn && (
                               <div className="absolute inset-0 flex animate-pulse items-center justify-center bg-page/80 text-sm text-muted">
                                 Rendering…
@@ -264,7 +302,7 @@ export default function Result() {
                             )}
                           </>
                         ) : (
-                          <img src={imageUrl} alt="Original PCB" className="mx-auto block max-h-[480px] w-full object-contain" />
+                          <img src={imageUrl} alt="Original PCB" style={fitStyle} className="mx-auto block h-auto w-full" />
                         )}
                       </div>
 
