@@ -1,5 +1,6 @@
 import os
 import io
+import secrets
 import time
 import numpy as np
 import jwt
@@ -7,6 +8,7 @@ import bcrypt
 import requests as http_requests
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote, urlencode
 from flask import Flask, request, jsonify, make_response, redirect
 from ultralytics import YOLO
 from PIL import Image
@@ -26,12 +28,19 @@ print(f"[INFO] ✅ Model downloaded to: {MODEL_PATH}")
 app = Flask(__name__)
 
 # ── Config from environment ───────────────────────────────────
-JWT_SECRET          = os.environ.get("JWT_SECRET", "pcb_super_secret_key_change_in_prod")
+JWT_SECRET          = os.environ.get("JWT_SECRET", "")
+if not JWT_SECRET:
+    JWT_SECRET = secrets.token_hex(32)
+    print("[WARN] JWT_SECRET not set - using a random secret; tokens will be invalidated on restart")
 JWT_EXPIRES_HOURS   = int(os.environ.get("JWT_EXPIRES_HOURS", 24))
 MONGO_URI           = os.environ.get("MONGO_URI", "")
 GOOGLE_CLIENT_ID    = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET= os.environ.get("GOOGLE_CLIENT_SECRET", "")
 CLIENT_URL          = os.environ.get("CLIENT_URL", "http://localhost:5173")
+# CLIENT_URL may be a comma-separated list; the first entry is used for redirects
+ALLOWED_ORIGINS     = [u.strip().rstrip("/") for u in CLIENT_URL.split(",") if u.strip()]
+ALLOWED_ORIGINS    += ["http://localhost:5173", "http://127.0.0.1:5173"]
+CLIENT_URL          = ALLOWED_ORIGINS[0]
 SERVER_URL          = os.environ.get("SERVER_URL", "http://localhost:7860")
 
 # ── MongoDB ───────────────────────────────────────────────────
@@ -64,19 +73,19 @@ def get_model():
     return model
 
 # ── CORS helper ───────────────────────────────────────────────
-def cors(response, status=200):
-    r = make_response(response, status)
-    r.headers['Access-Control-Allow-Origin']  = CLIENT_URL
+def _cors_headers(r):
+    origin = request.headers.get("Origin", "")
+    r.headers['Access-Control-Allow-Origin']  = origin if origin in ALLOWED_ORIGINS else CLIENT_URL
+    r.headers['Vary']                         = 'Origin'
     r.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     r.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return r
 
+def cors(response, status=200):
+    return _cors_headers(make_response(response, status))
+
 def cors_preflight():
-    r = make_response(jsonify({}), 200)
-    r.headers['Access-Control-Allow-Origin']  = CLIENT_URL
-    r.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-    r.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    return r
+    return _cors_headers(make_response(jsonify({}), 200))
 
 # ── JWT helpers ───────────────────────────────────────────────
 def generate_token(user_id, email, name):
@@ -300,7 +309,10 @@ def google_callback():
         jwt_token = generate_token(user_id, g_email, g_name)
 
         # Redirect to frontend with token in URL param
-        return redirect(f"{CLIENT_URL}/oauth-success?token={jwt_token}&name={g_name}&email={g_email}")
+        return redirect(
+            f"{CLIENT_URL}/oauth-success#"
+            + urlencode({"token": jwt_token, "name": g_name, "email": g_email}, quote_via=quote)
+        )
 
     except Exception as e:
         print(f"[ERROR] google_callback: {e}")

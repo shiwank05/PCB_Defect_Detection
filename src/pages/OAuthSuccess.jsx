@@ -1,16 +1,18 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function OAuthSuccess() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    const name  = searchParams.get("name");
-    const email = searchParams.get("email");
+    // Token arrives in the URL fragment so it is never sent to servers or logged
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const token = params.get("token");
+    const name  = params.get("name");
+    const email = params.get("email");
+    window.history.replaceState(null, "", window.location.pathname);
 
     if (token && email) {
       login(token, { name, email });
