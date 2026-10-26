@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
+import { API_URL } from "../config";
 
-// ✅ Local backend
-const API_URL = "https://shiwank05-pcb-backend.hf.space";
 
 export default function Detect() {
   const [image, setImage] = useState(null);

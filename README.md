@@ -84,7 +84,9 @@ npm install
 npm run dev
 ```
 
-Make sure the backend URL in the frontend points to your running Flask server.
+Set `VITE_API_URL` (see `.env.example`) to point the frontend at your Flask server.
+
+The backend needs `MONGO_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CLIENT_URL` (allowed frontend origin(s), comma-separated) and `SERVER_URL`.
 
 ---
 
@@ -94,4 +96,4 @@ Make sure the backend URL in the frontend points to your running Flask server.
 |---|---|---|
 | Frontend | Vercel | https://pcb-defect-detection.vercel.app |
 | Backend | HuggingFace Spaces | https://shiwank05-pcb-backend.hf.space |
-| Model weights | Git LFS | `best.pt` (~52MB) |
+| Model weights | Hugging Face Hub | `shiwank05/pcb-defect-model` (`best.pt`), downloaded at startup |
