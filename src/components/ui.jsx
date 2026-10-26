@@ -85,12 +85,16 @@ export function Container({ className, children }) {
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <div className="animate-enter mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted sm:text-base">{subtitle}</p>}
+    <div className="animate-enter mb-8 flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 sm:flex-1">
+        <h1 className="break-words text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h1>
+        {subtitle && <div className="mt-1 min-w-0 text-sm text-muted sm:text-base">{subtitle}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+      {actions && (
+        <div className="flex w-full shrink-0 items-center gap-3 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
@@ -147,7 +151,9 @@ export function StatCard({ icon, tone = "primary", label, value, hint }) {
         <IconBadge icon={icon} tone={tone} />
         <div className="min-w-0">
           <p className="text-sm text-muted">{label}</p>
-          <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-ink">{value}</p>
+          <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-ink" title={String(value)}>
+            {value}
+          </p>
           {hint && <p className="mt-0.5 text-sm text-muted">{hint}</p>}
         </div>
       </div>
@@ -158,7 +164,7 @@ export function StatCard({ icon, tone = "primary", label, value, hint }) {
 /* ── Buttons ────────────────────────────────────────────── */
 
 const buttonBase =
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:translate-y-0";
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none motion-safe:enabled:hover:-translate-y-px motion-safe:enabled:active:translate-y-0";
 const buttonVariants = {
   primary: "bg-primary text-white shadow-card hover:bg-primary-hover hover:shadow-raise",
   secondary:
@@ -222,6 +228,20 @@ export function Input({ className, invalid, ...rest }) {
   );
 }
 
+export function Select({ className, children, ...rest }) {
+  return (
+    <select
+      className={cx(
+        "rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink shadow-card transition duration-150 hover:border-muted focus:border-primary focus:ring-4 focus:ring-primary/10",
+        className
+      )}
+      {...rest}
+    >
+      {children}
+    </select>
+  );
+}
+
 /* ── Feedback ───────────────────────────────────────────── */
 
 const tones = {
@@ -265,7 +285,7 @@ export function Alert({ tone = "danger", className, children }) {
       )}
     >
       <Icon name={alertIcons[tone]} className="mt-0.5 h-4 w-4 flex-none" />
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 break-words">{children}</div>
     </div>
   );
 }

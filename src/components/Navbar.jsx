@@ -67,7 +67,7 @@ export default function Navbar() {
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary">
                     {user.name?.[0]?.toUpperCase() || "U"}
                   </span>
-                  <span className="hidden text-sm font-medium text-ink sm:inline">
+                  <span className="hidden max-w-[10rem] truncate text-sm font-medium text-ink sm:inline">
                     {user.name?.split(" ")[0]}
                   </span>
                   <Icon

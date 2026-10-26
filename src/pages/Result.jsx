@@ -1,9 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import {
   Alert, Badge, Button, Card, CardHeader, Container, EmptyState, Icon, IconBadge, Meter,
-  PageHeader, StatCard,
+  PageHeader, Select, StatCard,
 } from "../components/ui";
 
 // Box colors used on the annotated image (also used for the legend)
@@ -16,18 +16,45 @@ const CLASS_COLORS = {
   "Spurious Copper": "#7c3aed",
 };
 const FALLBACK_COLOR = "#4f46e5";
+const colorFor = name => CLASS_COLORS[name] || FALLBACK_COLOR;
 
 const LEVEL_TONE = { HIGH: "danger", MEDIUM: "warning", LOW: "neutral", EXCELLENT: "success" };
 const LEVEL_METER = { HIGH: "danger", MEDIUM: "warning", LOW: "primary", EXCELLENT: "success" };
 
 // Same thresholds the backend uses to label an analysis row
-// Annotation sizes in on-screen pixels
-const LABEL_FONT = 12;
-const LABEL_PAD_X = 6;
-const LABEL_PAD_Y = 3;
+const levelFor = conf => (conf > 80 ? "HIGH" : conf > 55 ? "MEDIUM" : "LOW");
+
+// Annotation sizes in on-screen pixels (divided by the image scale when drawn)
+const BOX_LINE = 2;
+const BOX_LINE_HOVER = 4;
+const BADGE_SIZE = 16;
+const BADGE_FONT = 10;
 const MAX_IMG_HEIGHT = 480;
 
-const levelFor = conf => (conf > 80 ? "HIGH" : conf > 55 ? "MEDIUM" : "LOW");
+// Backend runs the model with conf=0.25, so 25% is the default filter
+const DEFAULT_MIN_CONF = 25;
+const CONF_OPTIONS = [
+  { value: 0, label: "All" },
+  { value: 25, label: "25%" },
+  { value: 50, label: "50%" },
+  { value: 70, label: "70%" },
+];
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+
+/** Small numbered badge shared by the canvas legend and the defect list. */
+function NumberBadge({ n, color, active }) {
+  return (
+    <span
+      className={`inline-flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 transition duration-150 ${
+        active ? "ring-primary" : "ring-white"
+      }`}
+      style={{ background: color }}
+    >
+      {n}
+    </span>
+  );
+}
 
 export default function Result() {
   const location = useLocation();
@@ -48,11 +75,24 @@ export default function Result() {
   const [bboxDrawn, setBboxDrawn] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const [activeTab, setActiveTab] = useState("annotated"); // "annotated" | "original"
+  const [minConf, setMinConf] = useState(DEFAULT_MIN_CONF);
+  const [hoverN, setHoverN] = useState(null); // number of the highlighted detection
 
   const bboxCanvasRef = useRef(null);
   const imgRef = useRef(null);
   const [natural, setNatural] = useState(null); // natural image size
   const [displayW, setDisplayW] = useState(0);  // on-screen canvas width
+
+  // Number detections in response order; the number stays fixed when filtering,
+  // so the canvas badges and the list always match.
+  const numbered = useMemo(
+    () => (state.detections || []).map((d, i) => ({ ...d, n: i + 1 })),
+    [state.detections]
+  );
+  const visible = useMemo(
+    () => numbered.filter(d => d.confidence >= minConf),
+    [numbered, minConf]
+  );
 
   // ── Load the image once; remember its natural size ───────────
   useEffect(() => {
@@ -77,52 +117,87 @@ export default function Result() {
     return () => ro.disconnect();
   }, [activeTab, natural]);
 
-  // ── Draw real bounding boxes ─────────────────────────────────
-  // The canvas keeps the image's natural resolution but is shown scaled by
-  // CSS. Sizes below are given in on-screen pixels and divided by the scale,
-  // so line width, label font and padding stay constant on screen.
+  // ── Draw real bounding boxes + numbered badges ───────────────
+  // The canvas is drawn at its on-screen size, so line width and badge size
+  // are given in screen pixels and stay constant whatever the image size.
   useEffect(() => {
     const canvas = bboxCanvasRef.current;
     const img = imgRef.current;
     if (activeTab !== "annotated" || !natural || !displayW || !canvas || !img) return;
     const ctx = canvas.getContext("2d");
+    // Draw at the displayed size (x device pixel ratio) so lines and badges stay
+    // crisp even when the source image is tiny; box coordinates are scaled by k.
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(displayW * dpr);
+    const H = Math.round((W * natural.h) / natural.w);
+    const k = W / natural.w;
+    const px = dpr;
 
-    canvas.width  = natural.w;
-    canvas.height = natural.h;
-    ctx.drawImage(img, 0, 0);
+    canvas.width  = W;
+    canvas.height = H;
+    ctx.drawImage(img, 0, 0, W, H);
 
-    const px = natural.w / displayW; // canvas pixels per on-screen pixel
+    const d = BADGE_SIZE * px;
+    const r = d / 2;
+    const anyHover = hoverN !== null;
 
-    detections.forEach(det => {
+    // Boxes (hovered one is thicker and drawn last; the rest are dimmed)
+    const boxOrder = [...visible].sort((a, b) => (a.n === hoverN) - (b.n === hoverN));
+    boxOrder.forEach(det => {
       const { x1, y1, x2, y2 } = det.bbox;
-      const col = CLASS_COLORS[det.class_name] || FALLBACK_COLOR;
-      const lbl = `${det.class_name} ${det.confidence}%`;
-      const line = 2 * px;
+      const hot = det.n === hoverN;
+      ctx.globalAlpha = anyHover && !hot ? 0.35 : 1;
+      ctx.strokeStyle = colorFor(det.class_name);
+      ctx.lineWidth   = (hot ? BOX_LINE_HOVER : BOX_LINE) * px;
+      ctx.strokeRect(x1 * k, y1 * k, (x2 - x1) * k, (y2 - y1) * k);
+    });
+    ctx.globalAlpha = 1;
 
-      // Box
-      ctx.strokeStyle = col;
-      ctx.lineWidth   = line;
-      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-
-      // Label
-      ctx.font = `600 ${LABEL_FONT * px}px Inter, system-ui, sans-serif`;
-      const lblW = ctx.measureText(lbl).width + LABEL_PAD_X * 2 * px;
-      const lblH = (LABEL_FONT + LABEL_PAD_Y * 2) * px;
-
-      // Keep the label inside the canvas: shift left past the right edge,
-      // and sit inside the box when there is no room above it.
-      const lblX = Math.max(0, Math.min(x1, natural.w - lblW));
-      const lblY = y1 - lblH < 0 ? y1 + line : y1 - lblH;
-
-      ctx.fillStyle = col;
-      ctx.fillRect(lblX, lblY, lblW, lblH);
-      ctx.fillStyle = "#fff";
-      ctx.textBaseline = "middle";
-      ctx.fillText(lbl, lblX + LABEL_PAD_X * px, lblY + lblH / 2);
+    // Badge positions: top-left corner of each box, kept inside the canvas.
+    // If it would overlap an earlier badge, nudge it down or right.
+    const placed = [];
+    const isFree = (cx, cy) => placed.every(p => Math.hypot(p.cx - cx, p.cy - cy) >= d * 0.95);
+    visible.forEach(det => {
+      let cx = clamp(det.bbox.x1 * k, r, W - r);
+      let cy = clamp(det.bbox.y1 * k, r, H - r);
+      if (!isFree(cx, cy)) {
+        const step = d * 0.6;
+        const baseX = cx;
+        const baseY = cy;
+        search: for (let k = 1; k <= 6; k++) {
+          for (const [dx, dy] of [[0, 1], [1, 0], [1, 1]]) {
+            const tx = clamp(baseX + dx * k * step, r, W - r);
+            const ty = clamp(baseY + dy * k * step, r, H - r);
+            if (isFree(tx, ty)) { cx = tx; cy = ty; break search; }
+          }
+        }
+      }
+      placed.push({ det, cx, cy });
     });
 
+    // Draw badges, hovered one last so it is on top
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    [...placed]
+      .sort((a, b) => (a.det.n === hoverN) - (b.det.n === hoverN))
+      .forEach(({ det, cx, cy }) => {
+        const hot = det.n === hoverN;
+        ctx.globalAlpha = anyHover && !hot ? 0.5 : 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = colorFor(det.class_name);
+        ctx.fill();
+        ctx.lineWidth = (hot ? 2 : 1.5) * px;
+        ctx.strokeStyle = "#fff";
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.font = `700 ${BADGE_FONT * px}px Inter, system-ui, sans-serif`;
+        ctx.fillText(String(det.n), cx, cy + 0.5 * px);
+      });
+    ctx.globalAlpha = 1;
+
     setBboxDrawn(true);
-  }, [activeTab, natural, displayW, detections]);
+  }, [activeTab, natural, displayW, visible, hoverN]);
 
   // ── No state guard ───────────────────────────────────────────
   if (!location.state) {
@@ -142,6 +217,24 @@ export default function Result() {
       </div>
     );
   }
+
+  // Hovering a box on the canvas highlights its row (smallest box under the cursor wins)
+  const handleCanvasMove = e => {
+    if (!natural) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) * natural.w) / rect.width;
+    const y = ((e.clientY - rect.top) * natural.h) / rect.height;
+    let hit = null;
+    let area = Infinity;
+    visible.forEach(det => {
+      const { x1, y1, x2, y2 } = det.bbox;
+      if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+        const a = (x2 - x1) * (y2 - y1);
+        if (a < area) { area = a; hit = det.n; }
+      }
+    });
+    setHoverN(prev => (prev === hit ? prev : hit));
+  };
 
   // Show the image at most 2x its natural width (and no taller than the cap), centered
   const fitStyle = natural
@@ -170,14 +263,21 @@ export default function Result() {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-clip">
       <Navbar />
 
       <main>
         <Container className="py-8 sm:py-10">
           <PageHeader
             title="Inspection result"
-            subtitle={`${boardId} · ${fileName}`}
+            subtitle={
+              <div className="flex min-w-0 flex-col items-start gap-1.5">
+                <Badge tone="neutral">{boardId}</Badge>
+                <p className="max-w-full truncate text-sm text-muted sm:max-w-lg" title={fileName}>
+                  {fileName}
+                </p>
+              </div>
+            }
             actions={
               <>
                 <Button variant="secondary" onClick={() => navigate("/")}>
@@ -212,7 +312,7 @@ export default function Result() {
                         ? `${defectCount} defect${defectCount > 1 ? "s" : ""} found`
                         : "Board passed inspection"}
                     </h2>
-                    <p className="mt-1 max-w-2xl text-sm text-body">
+                    <p className="mt-1 max-w-2xl break-words text-sm text-body">
                       {isDefect
                         ? `Defects cover ${affectedArea} of the scan area. The board requires inspection before deployment.`
                         : "No defects detected. The board meets all quality control standards."}
@@ -260,7 +360,7 @@ export default function Result() {
 
             <div className="grid gap-6 lg:grid-cols-5">
               {/* Left column: image + metadata */}
-              <div className="space-y-6 lg:col-span-3">
+              <div className="min-w-0 space-y-6 lg:col-span-3">
                 {imageUrl && (
                   <Card>
                     <CardHeader
@@ -291,10 +391,36 @@ export default function Result() {
                           The annotated image could not be rendered. Try the Original tab.
                         </Alert>
                       )}
+
+                      {numbered.length > 0 && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                          <label className="flex items-center gap-2 text-sm text-body">
+                            Min confidence
+                            <Select
+                              value={minConf}
+                              onChange={e => { setMinConf(Number(e.target.value)); setHoverN(null); }}
+                            >
+                              {CONF_OPTIONS.map(o => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              ))}
+                            </Select>
+                          </label>
+                          <span className="text-sm text-muted">
+                            Showing {visible.length} of {numbered.length}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="relative overflow-hidden rounded-lg border border-line bg-page">
                         {activeTab === "annotated" ? (
                           <>
-                            <canvas ref={bboxCanvasRef} style={fitStyle} className="mx-auto block h-auto w-full" />
+                            <canvas
+                              ref={bboxCanvasRef}
+                              style={fitStyle}
+                              className="mx-auto block h-auto w-full"
+                              onMouseMove={handleCanvasMove}
+                              onMouseLeave={() => setHoverN(null)}
+                            />
                             {!bboxDrawn && (
                               <div className="absolute inset-0 flex animate-pulse items-center justify-center bg-page/80 text-sm text-muted">
                                 Rendering…
@@ -310,10 +436,7 @@ export default function Result() {
                         <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
                           {uniqueClasses.map(name => (
                             <li key={name} className="flex items-center gap-2 text-sm text-body">
-                              <span
-                                className="h-3 w-3 rounded-sm"
-                                style={{ background: CLASS_COLORS[name] || FALLBACK_COLOR }}
-                              />
+                              <span className="h-3 w-3 rounded-sm" style={{ background: colorFor(name) }} />
                               {name}
                             </li>
                           ))}
@@ -328,8 +451,8 @@ export default function Result() {
                   <dl className="divide-y divide-line">
                     {meta.map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 px-5 py-3 text-sm">
-                        <dt className="text-muted">{k}</dt>
-                        <dd className="truncate font-medium text-ink">{v}</dd>
+                        <dt className="shrink-0 text-muted">{k}</dt>
+                        <dd className="min-w-0 truncate font-medium text-ink" title={String(v)}>{v}</dd>
                       </div>
                     ))}
                   </dl>
@@ -337,25 +460,33 @@ export default function Result() {
               </div>
 
               {/* Right column: defect list, analysis, recommendation */}
-              <div className="space-y-6 lg:col-span-2">
+              <div className="min-w-0 space-y-6 lg:col-span-2">
                 <Card>
                   <CardHeader
-                    title={`Defect list${detections.length ? ` (${detections.length})` : ""}`}
-                    description="Each detection with its severity and confidence"
+                    title={`Defect list${
+                      numbered.length
+                        ? ` (${visible.length}${visible.length !== numbered.length ? ` of ${numbered.length}` : ""})`
+                        : ""
+                    }`}
+                    description="Numbers match the badges on the image"
                   />
-                  {detections.length > 0 ? (
-                    <ul className="divide-y divide-line">
-                      {detections.map((det, i) => {
+                  {visible.length > 0 ? (
+                    <ul className="divide-y divide-line" onMouseLeave={() => setHoverN(null)}>
+                      {visible.map(det => {
                         const level = levelFor(det.confidence);
+                        const active = hoverN === det.n;
                         return (
-                          <li key={i} className="px-5 py-4">
+                          <li
+                            key={det.n}
+                            className={`px-5 py-4 transition-colors duration-150 ${active ? "bg-primary-soft" : ""}`}
+                            onMouseEnter={() => setHoverN(det.n)}
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <span className="flex min-w-0 items-center gap-2.5">
-                                <span
-                                  className="h-3 w-3 flex-none rounded-sm"
-                                  style={{ background: CLASS_COLORS[det.class_name] || FALLBACK_COLOR }}
-                                />
-                                <span className="truncate text-sm font-medium text-ink">{det.class_name}</span>
+                                <NumberBadge n={det.n} color={colorFor(det.class_name)} active={active} />
+                                <span className="truncate text-sm font-medium text-ink" title={det.class_name}>
+                                  {det.class_name}
+                                </span>
                               </span>
                               <span className="flex flex-none items-center gap-2">
                                 <Badge tone={LEVEL_TONE[level]}>{level}</Badge>
@@ -372,6 +503,17 @@ export default function Result() {
                         );
                       })}
                     </ul>
+                  ) : numbered.length > 0 ? (
+                    <EmptyState
+                      icon="info"
+                      title="No detections at this threshold"
+                      description={`All ${numbered.length} detections are below ${minConf}% confidence.`}
+                      action={
+                        <Button variant="secondary" size="sm" onClick={() => setMinConf(0)}>
+                          Show all
+                        </Button>
+                      }
+                    />
                   ) : (
                     <EmptyState
                       icon="check-circle"
@@ -388,8 +530,10 @@ export default function Result() {
                       {analysis.map(item => (
                         <li key={item.label} className="px-5 py-4">
                           <div className="mb-2 flex items-center justify-between gap-3">
-                            <span className="text-sm font-medium text-ink">{item.label}</span>
-                            <span className="flex items-center gap-2">
+                            <span className="min-w-0 truncate text-sm font-medium text-ink" title={item.label}>
+                              {item.label}
+                            </span>
+                            <span className="flex flex-none items-center gap-2">
                               <Badge tone={LEVEL_TONE[item.level] || "neutral"}>{item.level}</Badge>
                               <span className="w-10 text-right text-sm font-medium text-ink">{item.bar}%</span>
                             </span>
@@ -405,12 +549,12 @@ export default function Result() {
                   <CardHeader
                     title="Recommendation"
                     action={
-                      <Badge tone={isDefect ? "warning" : "success"}>
+                      <Badge tone={isDefect ? "warning" : "success"} className="whitespace-nowrap">
                         {isDefect ? "Action required" : "Approved"}
                       </Badge>
                     }
                   />
-                  <p className="px-5 py-4 text-sm text-body">
+                  <p className="break-words px-5 py-4 text-sm text-body">
                     {isDefect
                       ? `Board ${boardId} flagged with ${defectCount} defect${defectCount > 1 ? "s" : ""} across ${affectedArea} of scan area. Remove from production line immediately. Perform visual inspection under 10× magnification. Log incident in QC system.`
                       : `Board ${boardId} passed all automated quality checks with ${targetConf}% confidence. Zero defects across all inspection layers. Cleared for next manufacturing stage. Log approval in QC system.`}

@@ -164,7 +164,7 @@ export default function Detect() {
                           className="h-12 w-12 flex-none rounded-md border border-line object-cover"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-ink">{image?.name}</p>
+                          <p className="truncate text-sm font-medium text-ink" title={image?.name}>{image?.name}</p>
                           <p className="text-sm text-muted">
                             {formatSize(image?.size)} · {image?.type?.split("/")[1]?.toUpperCase()}
                           </p>
