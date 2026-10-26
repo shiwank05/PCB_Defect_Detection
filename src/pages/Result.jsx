@@ -1,6 +1,23 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
+import {
+  Badge, Button, Card, CardHeader, Container, EmptyState, Meter, PageHeader,
+} from "../components/ui";
+
+// Box colors used on the annotated image (also used for the legend)
+const CLASS_COLORS = {
+  "Missing Hole":    "#2563eb",
+  "Mouse Bite":      "#ea580c",
+  "Open Circuit":    "#dc2626",
+  "Short":           "#db2777",
+  "Spur":            "#ca8a04",
+  "Spurious Copper": "#7c3aed",
+};
+const FALLBACK_COLOR = "#4f46e5";
+
+const LEVEL_TONE = { HIGH: "danger", MEDIUM: "warning", LOW: "neutral", EXCELLENT: "success" };
+const LEVEL_METER = { HIGH: "danger", MEDIUM: "warning", LOW: "primary", EXCELLENT: "success" };
 
 export default function Result() {
   const location = useLocation();
@@ -16,53 +33,16 @@ export default function Result() {
   const analysis     = state.analysis     || [];
   const detections   = state.detections   || [];
   const imageUrl     = state.imageUrl     || null;
-  const imageSize    = state.imageSize    || null;
   const targetConf   = state.confidence   || (isDefect ? 89 : 97);
 
-  const [revealed, setRevealed]     = useState(false);
-  const [conf, setConf]             = useState(0);
-  const [barWidths, setBarWidths]   = useState(analysis.map(() => 0));
-  const [glitch, setGlitch]         = useState(false);
-  const [bboxDrawn, setBboxDrawn]   = useState(false);
-  const [activeTab, setActiveTab]   = useState("annotated"); // "annotated" | "original"
+  const [bboxDrawn, setBboxDrawn] = useState(false);
+  const [activeTab, setActiveTab] = useState("annotated"); // "annotated" | "original"
 
-  const radarCanvasRef = useRef(null);
-  const bboxCanvasRef  = useRef(null);
-
-  const accent    = isDefect ? "#ff4455" : "#00ff78";
-  const accentB   = isDefect ? "rgba(255,68,85,0.18)"  : "rgba(0,255,120,0.12)";
-  const accentBo  = isDefect ? "rgba(255,68,85,0.35)"  : "rgba(0,255,120,0.3)";
-  const accentRgb = isDefect ? "255,68,85"              : "0,255,120";
-
-  // ── Reveal on mount ──────────────────────────────────────────
-  useEffect(() => { setTimeout(() => setRevealed(true), 250); }, []);
-
-  // ── Animate confidence ring ──────────────────────────────────
-  useEffect(() => {
-    if (!revealed) return;
-    let c = 0;
-    const id = setInterval(() => {
-      c += 1.8;
-      if (c >= targetConf) { setConf(targetConf); clearInterval(id); }
-      else setConf(Math.round(c));
-    }, 18);
-    analysis.forEach((_, i) => {
-      setTimeout(() => setBarWidths(prev => {
-        const n = [...prev]; n[i] = analysis[i].bar; return n;
-      }), 500 + i * 180);
-    });
-    return () => clearInterval(id);
-  }, [revealed]);
-
-  // ── Glitch on load ───────────────────────────────────────────
-  useEffect(() => {
-    setTimeout(() => { setGlitch(true); setTimeout(() => setGlitch(false), 300); }, 600);
-    setTimeout(() => { setGlitch(true); setTimeout(() => setGlitch(false), 200); }, 1100);
-  }, []);
+  const bboxCanvasRef = useRef(null);
 
   // ── Draw real bounding boxes ─────────────────────────────────
   useEffect(() => {
-    if (!revealed || !imageUrl || !bboxCanvasRef.current) return;
+    if (activeTab !== "annotated" || !imageUrl || !bboxCanvasRef.current) return;
     const canvas = bboxCanvasRef.current;
     const ctx    = canvas.getContext("2d");
     const img    = new Image();
@@ -74,56 +54,29 @@ export default function Result() {
 
       if (detections.length === 0) { setBboxDrawn(true); return; }
 
-      // Color map per class
-      const colorMap = {
-        "Missing Hole":    "#00c8ff",
-        "Mouse Bite":      "#ff9900",
-        "Open Circuit":    "#ff4455",
-        "Short":           "#ff00aa",
-        "Spur":            "#ffdd00",
-        "Spurious Copper": "#cc44ff",
-      };
-
       detections.forEach(det => {
         const { x1, y1, x2, y2 } = det.bbox;
         const w   = x2 - x1;
         const h   = y2 - y1;
-        const col = colorMap[det.class_name] || accent;
-        const lbl = `${det.class_name}  ${det.confidence}%`;
+        const col = CLASS_COLORS[det.class_name] || FALLBACK_COLOR;
+        const lbl = `${det.class_name} ${det.confidence}%`;
 
-        // Box glow
-        ctx.shadowBlur   = 12;
-        ctx.shadowColor  = col;
-        ctx.strokeStyle  = col;
-        ctx.lineWidth    = Math.max(2, canvas.width / 320);
+        // Box
+        ctx.strokeStyle = col;
+        ctx.lineWidth   = Math.max(2, canvas.width / 320);
         ctx.strokeRect(x1, y1, w, h);
-        ctx.shadowBlur   = 0;
 
-        // Corner decorations
-        const cs = Math.min(w, h) * 0.18;
-        ctx.lineWidth = Math.max(3, canvas.width / 200);
-        [[x1,y1,1,1],[x2,y1,-1,1],[x1,y2,1,-1],[x2,y2,-1,-1]].forEach(([cx,cy,dx,dy]) => {
-          ctx.beginPath();
-          ctx.moveTo(cx + dx * cs, cy);
-          ctx.lineTo(cx, cy);
-          ctx.lineTo(cx, cy + dy * cs);
-          ctx.strokeStyle = col;
-          ctx.stroke();
-        });
-
-        // Label background
+        // Label
         const fontSize = Math.max(11, canvas.width / 60);
-        ctx.font = `bold ${fontSize}px 'Share Tech Mono', monospace`;
+        ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
         const txtW = ctx.measureText(lbl).width;
         const lblH = fontSize + 8;
         const lblY = y1 - lblH < 0 ? y1 + 2 : y1 - lblH;
 
         ctx.fillStyle = col;
         ctx.fillRect(x1, lblY, txtW + 14, lblH);
-
-        // Label text
-        ctx.fillStyle = "#000";
-        ctx.fillText(lbl, x1 + 7, lblY + lblH - 5);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(lbl, x1 + 7, lblY + lblH - 6);
       });
 
       setBboxDrawn(true);
@@ -131,458 +84,238 @@ export default function Result() {
 
     img.onerror = () => { setBboxDrawn(true); };
     img.src = imageUrl;
-  }, [revealed, imageUrl, detections]);
-
-  // ── Radar chart ──────────────────────────────────────────────
-  useEffect(() => {
-    const canvas = radarCanvasRef.current;
-    if (!canvas || !analysis.length) return;
-    const ctx  = canvas.getContext("2d");
-    const size = Math.min(160, window.innerWidth * 0.38);
-    canvas.width = size; canvas.height = size;
-    const cx = size / 2, cy = size / 2, R = size * 0.38;
-    let angle = 0, animId;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, size, size);
-      [1, 0.66, 0.33].forEach(r => {
-        ctx.beginPath(); ctx.arc(cx, cy, R * r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(${accentRgb},0.1)`; ctx.lineWidth = 1; ctx.stroke();
-      });
-      analysis.forEach((item, i) => {
-        const a = (Math.PI * 2 * i) / analysis.length - Math.PI / 2;
-        ctx.beginPath(); ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
-        ctx.strokeStyle = `rgba(${accentRgb},0.15)`; ctx.lineWidth = 1; ctx.stroke();
-        const lx = cx + (R + 14) * Math.cos(a), ly = cy + (R + 14) * Math.sin(a);
-        ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.font = `6px 'Share Tech Mono'`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(item.label.split(" ")[0].slice(0, 5).toUpperCase(), lx, ly);
-      });
-      ctx.beginPath();
-      analysis.forEach((item, i) => {
-        const a = (Math.PI * 2 * i) / analysis.length - Math.PI / 2;
-        const r = R * (item.bar / 100);
-        i === 0
-          ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
-          : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-      });
-      ctx.closePath();
-      ctx.fillStyle   = `rgba(${accentRgb},0.1)`; ctx.fill();
-      ctx.strokeStyle = accent; ctx.lineWidth = 1.2; ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + R * Math.cos(angle), cy + R * Math.sin(angle));
-      ctx.strokeStyle = `rgba(${accentRgb},0.45)`; ctx.lineWidth = 1.2; ctx.stroke();
-      angle += 0.025;
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(animId);
-  }, [revealed, analysis, isDefect]);
-
-  const levelColor = lvl => {
-    if (lvl === "HIGH")      return "#ff4455";
-    if (lvl === "MEDIUM")    return "#ffaa00";
-    if (lvl === "LOW")       return "#ffdd44";
-    if (lvl === "EXCELLENT") return "#00ff78";
-    return "#00c8ff";
-  };
+  }, [activeTab, imageUrl, detections]);
 
   // ── No state guard ───────────────────────────────────────────
   if (!location.state) {
     return (
-      <div style={{ minHeight: "100vh", background: "#010508", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 20, fontFamily: "monospace", color: "#00ff78" }}>
-        <div style={{ fontSize: 14, letterSpacing: 3 }}>NO SCAN DATA FOUND</div>
-        <button onClick={() => navigate("/detect")} style={{ background: "none", border: "1px solid #00ff78", color: "#00ff78", padding: "12px 24px", cursor: "pointer", fontFamily: "monospace", letterSpacing: 2 }}>
-          GO TO DETECT
-        </button>
+      <div className="min-h-screen bg-page">
+        <Navbar />
+        <Container className="py-16">
+          <Card>
+            <EmptyState
+              title="No scan data found"
+              description="Run a detection first to see results here."
+              action={<Button onClick={() => navigate("/detect")}>Go to detect</Button>}
+            />
+          </Card>
+        </Container>
       </div>
     );
   }
 
-  return (
-    <div className="rs-root">
-      <div className="rs-grid" />
-      <div className="rs-vignette" />
-      <div className="rs-noise" />
-      <div className="rs-glow" style={{ background: `radial-gradient(circle,${isDefect ? "rgba(255,50,60,0.06)" : "rgba(0,255,120,0.05)"} 0%,transparent 70%)` }} />
+  const uniqueClasses = [...new Set(detections.map(d => d.class_name))];
 
+  const meta = [
+    ["Board ID", boardId],
+    ["File", fileName],
+    ["Scan time", `${scanTime}s`],
+    ["Defects", String(defectCount)],
+    ["Affected area", affectedArea],
+    ["Model", "YOLOv8m"],
+    ["Scanned at", new Date().toLocaleTimeString()],
+  ];
+
+  return (
+    <div className="min-h-screen bg-page">
       <Navbar />
 
-      <main className="rs-main" style={{ opacity: revealed ? 1 : 0, transform: revealed ? "translateY(0)" : "translateY(16px)", transition: "all 0.9s cubic-bezier(0.4,0,0.2,1)" }}>
+      <main>
+        <Container className="py-8 sm:py-10">
+          <PageHeader
+            title="Inspection result"
+            subtitle={`${boardId} · ${fileName}`}
+            actions={
+              <>
+                <Button variant="secondary" onClick={() => navigate("/")}>Home</Button>
+                <Button onClick={() => navigate("/detect")}>Scan another</Button>
+              </>
+            }
+          />
 
-        {/* VERDICT CARD */}
-        <div className="rs-verdict-card" style={{ borderColor: accentBo, background: accentB }}>
-          <div className="rs-verdict-icon-wrap">
-            {glitch && <span className="rs-glitch-r" style={{ color: isDefect ? "rgba(255,0,60,0.45)" : "rgba(0,200,255,0.35)" }}>{isDefect ? "⚠" : "✓"}</span>}
-            {glitch && <span className="rs-glitch-b" style={{ color: isDefect ? "rgba(0,200,255,0.35)" : "rgba(255,0,100,0.25)" }}>{isDefect ? "⚠" : "✓"}</span>}
-            <span className="rs-verdict-icon" style={{ color: accent }}>{isDefect ? "⚠" : "✓"}</span>
-          </div>
-          <div className="rs-verdict-row">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="rs-verdict-label" style={{ color: accent }}>{isDefect ? "DEFECT DETECTED" : "BOARD PASSED"}</div>
-              <div className="rs-verdict-sub">
-                {isDefect
-                  ? `${defectCount} defect${defectCount > 1 ? "s" : ""} found across ${affectedArea} of scan area. Board requires inspection before deployment.`
-                  : "No defects detected. Board meets all quality control standards."}
-              </div>
-              {/* Defect type badges */}
-              {isDefect && detections.length > 0 && (
-                <div className="rs-defect-badges">
-                  {[...new Set(detections.map(d => d.class_name))].map(name => (
-                    <span key={name} className="rs-defect-badge" style={{ borderColor: accentBo, color: accent }}>
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            {/* Confidence ring */}
-            <div className="rs-ring-wrap">
-              <svg width="100" height="100" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-                <circle cx="60" cy="60" r="50" fill="none" stroke={accent} strokeWidth="8" strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 50}`}
-                  strokeDashoffset={`${2 * Math.PI * 50 * (1 - conf / 100)}`}
-                  transform="rotate(-90 60 60)"
-                  style={{ transition: "stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)", filter: `drop-shadow(0 0 5px ${accent})` }}
-                />
-              </svg>
-              <div className="rs-ring-inner">
-                <span className="rs-ring-val" style={{ color: accent }}>{conf}%</span>
-                <span className="rs-ring-lbl">CONF.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 2-COL LAYOUT */}
-        <div className="rs-cols">
-
-          {/* LEFT COL */}
-          <div className="rs-left">
-            <div className="rs-section-tag"><span className="rs-tag-dot" style={{ background: accent }} />// SCAN METADATA</div>
-
-            <div className="rs-meta">
-              {[
-                { k: "BOARD ID",    v: boardId },
-                { k: "FILE",        v: fileName },
-                { k: "SCAN TIME",   v: `${scanTime}s` },
-                { k: "RESULT",      v: isDefect ? "FAIL" : "PASS", highlight: true },
-                { k: "DEFECTS",     v: String(defectCount),  highlight: isDefect },
-                { k: "AFFECTED",    v: affectedArea,          highlight: isDefect },
-                { k: "MODEL",       v: "YOLOv8m" },
-                { k: "mAP@0.5",     v: "93.6%" },
-                { k: "TIME",        v: new Date().toLocaleTimeString() },
-              ].map(({ k, v, highlight }) => (
-                <div key={k} className="rs-meta-row">
-                  <span className="rs-meta-key">{k}</span>
-                  <span className="rs-meta-val" style={{ color: highlight ? accent : "rgba(255,255,255,0.6)" }}>{v}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Annotated image */}
-            {imageUrl && (
-              <div className="rs-img-panel">
-                <div className="rs-img-tabs">
-                  <div className="rs-section-tag" style={{ marginBottom: 0 }}>
-                    <span className="rs-tag-dot" style={{ background: accent }} />// SCAN IMAGE
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button className={`rs-tab${activeTab === "annotated" ? " rs-tab-active" : ""}`}
-                      onClick={() => setActiveTab("annotated")}
-                      style={{ borderColor: activeTab === "annotated" ? accentBo : "rgba(255,255,255,0.1)", color: activeTab === "annotated" ? accent : "rgba(255,255,255,0.3)" }}>
-                      ANNOTATED
-                    </button>
-                    <button className={`rs-tab${activeTab === "original" ? " rs-tab-active" : ""}`}
-                      onClick={() => setActiveTab("original")}
-                      style={{ borderColor: activeTab === "original" ? accentBo : "rgba(255,255,255,0.1)", color: activeTab === "original" ? accent : "rgba(255,255,255,0.3)" }}>
-                      ORIGINAL
-                    </button>
-                  </div>
-                </div>
-                <div className="rs-img-box" style={{ borderColor: accentBo }}>
-                  {activeTab === "annotated" ? (
-                    <>
-                      <canvas ref={bboxCanvasRef} className="rs-bbox-canvas" />
-                      {!bboxDrawn && (
-                        <div className="rs-img-loading">
-                          <span style={{ color: accent, fontSize: 9, letterSpacing: 2 }}>RENDERING...</span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <img src={imageUrl} alt="Original PCB" className="rs-original-img" />
-                  )}
-                </div>
-                {/* Legend */}
-                {isDefect && detections.length > 0 && (
-                  <div className="rs-legend">
-                    {[...new Map(detections.map(d => [d.class_name, d])).values()].map(det => {
-                      const colorMap = {
-                        "Missing Hole": "#00c8ff", "Mouse Bite": "#ff9900",
-                        "Open Circuit": "#ff4455", "Short": "#ff00aa",
-                        "Spur": "#ffdd00", "Spurious Copper": "#cc44ff"
-                      };
-                      const c = colorMap[det.class_name] || accent;
-                      return (
-                        <div key={det.class_name} className="rs-legend-item">
-                          <span className="rs-legend-dot" style={{ background: c }} />
-                          <span className="rs-legend-txt">{det.class_name}</span>
-                        </div>
-                      );
-                    })}
+          {/* Verdict */}
+          <Card
+            className={`mb-6 p-5 sm:p-6 ${
+              isDefect ? "border-danger/30 bg-danger-soft" : "border-success/30 bg-success-soft"
+            }`}
+          >
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <Badge tone={isDefect ? "danger" : "success"}>
+                  {isDefect ? "Fail" : "Pass"}
+                </Badge>
+                <h2 className="mt-3 text-xl font-semibold text-ink sm:text-2xl">
+                  {isDefect ? "Defects detected" : "Board passed inspection"}
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-body">
+                  {isDefect
+                    ? `${defectCount} defect${defectCount > 1 ? "s" : ""} found across ${affectedArea} of the scan area. The board requires inspection before deployment.`
+                    : "No defects detected. The board meets all quality control standards."}
+                </p>
+                {isDefect && uniqueClasses.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {uniqueClasses.map(name => (
+                      <Badge key={name} tone="danger">{name}</Badge>
+                    ))}
                   </div>
                 )}
               </div>
-            )}
-
-            <div className="rs-actions">
-              <button className="rs-btn-primary" style={{ borderColor: accentBo, color: accent }}
-                onClick={() => navigate("/detect")}
-                onMouseEnter={e => { e.currentTarget.style.background = accentB; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                ↺ SCAN ANOTHER
-              </button>
-              <button className="rs-btn-secondary" onClick={() => navigate("/")}>⌂ HOME</button>
-            </div>
-          </div>
-
-          {/* RIGHT COL */}
-          <div className="rs-right">
-            <div className="rs-section-tag"><span className="rs-tag-dot" style={{ background: accent }} />// ANALYSIS BREAKDOWN</div>
-
-            {analysis.length > 0 ? (
-              <>
-                {/* Radar + Bars */}
-                <div className="rs-analysis-top">
-                  <div className="rs-radar" style={{ borderColor: accentBo }}>
-                    <div className="rs-radar-label">PATTERN MAP</div>
-                    <canvas ref={radarCanvasRef} className="rs-canvas" />
-                    <div className="rs-radar-status" style={{ color: accent }}>
-                      <span className="rs-radar-dot" style={{ background: accent }} />
-                      {isDefect ? "ANOMALY" : "NOMINAL"}
-                    </div>
-                  </div>
-
-                  <div className="rs-bars">
-                    {analysis.map((item, i) => (
-                      <div key={i} className="rs-bar-item" style={{ opacity: revealed ? 1 : 0, transform: revealed ? "translateX(0)" : "translateX(16px)", transition: `all 0.5s ease ${0.3 + i * 0.12}s` }}>
-                        <div className="rs-bar-top">
-                          <div className="rs-bar-left">
-                            <span className="rs-bar-icon">{item.icon}</span>
-                            <span className="rs-bar-name">{item.label}</span>
-                          </div>
-                          <div className="rs-bar-right">
-                            <span className="rs-bar-level" style={{ color: levelColor(item.level), borderColor: levelColor(item.level) + "44", background: levelColor(item.level) + "12" }}>{item.level}</span>
-                            <span className="rs-bar-pct" style={{ color: accent }}>{item.bar}%</span>
-                          </div>
-                        </div>
-                        <div className="rs-track">
-                          <div className="rs-fill" style={{ width: `${barWidths[i] || 0}%`, background: `linear-gradient(90deg,${accent},${isDefect ? "#ff8800" : "#00c8ff"})`, boxShadow: `0 0 8px ${accent}88`, transition: `width 1.1s cubic-bezier(0.4,0,0.2,1) ${0.5 + i * 0.18}s` }}>
-                            <div className="rs-fill-head" style={{ background: accent, boxShadow: `0 0 8px ${accent}` }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              // No defects — show all-clear panel
-              <div className="rs-allclear" style={{ borderColor: accentBo, background: accentB }}>
-                <span style={{ fontSize: 32, color: accent }}>✓</span>
-                <div style={{ fontFamily: "'Orbitron',sans-serif", fontSize: 13, letterSpacing: 3, color: accent }}>ALL CLEAR</div>
-                <div style={{ fontFamily: "'Rajdhani',sans-serif", fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", lineHeight: 1.7 }}>
-                  No defects detected across all 6 inspection categories.<br />Board meets manufacturing quality standards.
-                </div>
+              <div className="flex-none sm:text-right">
+                <p className="text-4xl font-semibold tracking-tight text-ink">{targetConf}%</p>
+                <p className="text-sm text-muted">Top confidence</p>
               </div>
-            )}
+            </div>
+          </Card>
 
-            {/* Raw detections table */}
-            {detections.length > 0 && (
-              <>
-                <div className="rs-divider">
-                  <div className="rs-div-line" style={{ background: `linear-gradient(90deg,transparent,${accentBo})` }} />
-                  <div className="rs-div-node" style={{ background: accent, boxShadow: `0 0 7px ${accent}` }} />
-                  <div className="rs-div-line" style={{ background: `linear-gradient(90deg,${accentBo},transparent)` }} />
-                </div>
+          <div className="grid gap-6 lg:grid-cols-5">
+            {/* Left column: image + metadata */}
+            <div className="space-y-6 lg:col-span-3">
+              {imageUrl && (
+                <Card>
+                  <CardHeader
+                    title="Scan image"
+                    action={
+                      <div className="flex gap-1 rounded-lg bg-page p-1" role="tablist">
+                        {[["annotated", "Annotated"], ["original", "Original"]].map(([id, label]) => (
+                          <button
+                            key={id}
+                            role="tab"
+                            aria-selected={activeTab === id}
+                            onClick={() => setActiveTab(id)}
+                            className={`cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors duration-150 ${
+                              activeTab === id
+                                ? "bg-surface text-ink shadow-sm"
+                                : "text-muted hover:text-ink"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    }
+                  />
+                  <div className="p-5">
+                    <div className="relative overflow-hidden rounded-lg border border-line bg-page">
+                      {activeTab === "annotated" ? (
+                        <>
+                          <canvas ref={bboxCanvasRef} className="mx-auto block h-auto max-h-[480px] w-full object-contain" />
+                          {!bboxDrawn && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-page/80 text-sm text-muted">
+                              Rendering…
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <img src={imageUrl} alt="Original PCB" className="mx-auto block max-h-[480px] w-full object-contain" />
+                      )}
+                    </div>
 
-                <div className="rs-section-tag" style={{ marginBottom: 8 }}>
-                  <span className="rs-tag-dot" style={{ background: accent }} />// RAW DETECTIONS ({detections.length})
-                </div>
-
-                <div className="rs-table">
-                  <div className="rs-table-head">
-                    <span>CLASS</span>
-                    <span>CONFIDENCE</span>
-                    <span>BBOX (X1,Y1)</span>
-                    <span>SIZE</span>
+                    {isDefect && uniqueClasses.length > 0 && (
+                      <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                        {uniqueClasses.map(name => (
+                          <li key={name} className="flex items-center gap-2 text-sm text-body">
+                            <span
+                              className="h-3 w-3 rounded-sm"
+                              style={{ background: CLASS_COLORS[name] || FALLBACK_COLOR }}
+                            />
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {detections.map((det, i) => (
-                    <div key={i} className="rs-table-row" style={{ borderColor: i === 0 ? accentBo : "rgba(255,255,255,0.04)" }}>
-                      <span style={{ color: accent, fontSize: 9 }}>{det.class_name}</span>
-                      <span style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'Orbitron',sans-serif", fontSize: 10 }}>{det.confidence}%</span>
-                      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{det.bbox.x1},{det.bbox.y1}</span>
-                      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 9 }}>{det.bbox.x2 - det.bbox.x1}×{det.bbox.y2 - det.bbox.y1}</span>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader title="Scan details" />
+                <dl className="divide-y divide-line">
+                  {meta.map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-4 px-5 py-3 text-sm">
+                      <dt className="text-muted">{k}</dt>
+                      <dd className="truncate font-medium text-ink">{v}</dd>
                     </div>
                   ))}
-                </div>
-              </>
-            )}
-
-            <div className="rs-divider">
-              <div className="rs-div-line" style={{ background: `linear-gradient(90deg,transparent,${accentBo})` }} />
-              <div className="rs-div-node" style={{ background: accent, boxShadow: `0 0 7px ${accent}` }} />
-              <div className="rs-div-line" style={{ background: `linear-gradient(90deg,${accentBo},transparent)` }} />
+                </dl>
+              </Card>
             </div>
 
-            {/* Recommendation */}
-            <div className="rs-rec" style={{ borderColor: accentBo, background: `linear-gradient(135deg,${accentB},rgba(0,0,0,0.15))` }}>
-              <div className="rs-rec-header">
-                <span className="rs-rec-icon" style={{ color: accent }}>⟡</span>
-                <span className="rs-rec-title">ENGINEERING RECOMMENDATION</span>
-                <span className="rs-rec-badge" style={{ borderColor: accentBo, color: accent }}>{isDefect ? "ACTION REQ." : "APPROVED"}</span>
-              </div>
-              <p className="rs-rec-text">
-                {isDefect
-                  ? `Board ${boardId} flagged with ${defectCount} defect${defectCount > 1 ? "s" : ""} across ${affectedArea} of scan area. Remove from production line immediately. Perform visual inspection under 10× magnification. Log incident in QC system.`
-                  : `Board ${boardId} passed all automated quality checks with ${targetConf}% confidence. Zero defects across all inspection layers. Cleared for next manufacturing stage. Log approval in QC system.`}
-              </p>
-            </div>
+            {/* Right column: analysis, detections, recommendation */}
+            <div className="space-y-6 lg:col-span-2">
+              <Card>
+                <CardHeader title="Analysis breakdown" description="Confidence per defect type" />
+                {analysis.length > 0 ? (
+                  <ul className="divide-y divide-line">
+                    {analysis.map(item => (
+                      <li key={item.label} className="px-5 py-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-ink">{item.label}</span>
+                          <span className="flex items-center gap-2">
+                            <Badge tone={LEVEL_TONE[item.level] || "neutral"}>{item.level}</Badge>
+                            <span className="w-10 text-right text-sm font-medium text-ink">{item.bar}%</span>
+                          </span>
+                        </div>
+                        <Meter value={item.bar} tone={LEVEL_METER[item.level] || "primary"} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState
+                    title="All clear"
+                    description="No defects detected across all 6 inspection categories."
+                  />
+                )}
+              </Card>
 
-            {/* Bottom stats */}
-            <div className="rs-bottom-stats">
-              {[
-                { label: "ENGINE",   val: "YOLOv8m" },
-                { label: "TRAINING", val: "693 imgs" },
-                { label: "DURATION", val: `${scanTime}s` },
-                { label: "CLASSES",  val: "6" },
-              ].map(s => (
-                <div key={s.label} className="rs-bstat">
-                  <span className="rs-bstat-val">{s.val}</span>
-                  <span className="rs-bstat-lbl">{s.label}</span>
-                </div>
-              ))}
+              {detections.length > 0 && (
+                <Card>
+                  <CardHeader title={`Detections (${detections.length})`} />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-page text-xs text-muted">
+                        <tr>
+                          <th scope="col" className="px-5 py-2 font-medium">Class</th>
+                          <th scope="col" className="px-3 py-2 font-medium">Conf.</th>
+                          <th scope="col" className="px-3 py-2 font-medium">Position</th>
+                          <th scope="col" className="px-5 py-2 font-medium">Size</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line">
+                        {detections.map((det, i) => (
+                          <tr key={i}>
+                            <td className="whitespace-nowrap px-5 py-2.5 font-medium text-ink">{det.class_name}</td>
+                            <td className="px-3 py-2.5">{det.confidence}%</td>
+                            <td className="whitespace-nowrap px-3 py-2.5 text-muted">{det.bbox.x1}, {det.bbox.y1}</td>
+                            <td className="whitespace-nowrap px-5 py-2.5 text-muted">
+                              {det.bbox.x2 - det.bbox.x1}×{det.bbox.y2 - det.bbox.y1}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader
+                  title="Recommendation"
+                  action={
+                    <Badge tone={isDefect ? "warning" : "success"}>
+                      {isDefect ? "Action required" : "Approved"}
+                    </Badge>
+                  }
+                />
+                <p className="px-5 py-4 text-sm text-body">
+                  {isDefect
+                    ? `Board ${boardId} flagged with ${defectCount} defect${defectCount > 1 ? "s" : ""} across ${affectedArea} of scan area. Remove from production line immediately. Perform visual inspection under 10× magnification. Log incident in QC system.`
+                    : `Board ${boardId} passed all automated quality checks with ${targetConf}% confidence. Zero defects across all inspection layers. Cleared for next manufacturing stage. Log approval in QC system.`}
+                </p>
+              </Card>
             </div>
           </div>
-        </div>
+        </Container>
       </main>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
-        *{box-sizing:border-box}
-        @keyframes rs-blink{0%,100%{opacity:1}50%{opacity:0.25}}
-        @keyframes rs-noise{0%,100%{background-position:0 0}10%{background-position:-5% -10%}50%{background-position:-15% 10%}}
-
-        .rs-root{min-height:100vh;background:radial-gradient(ellipse at 20% 50%,#051510 0%,#020c10 45%,#010508 100%);font-family:'Share Tech Mono',monospace;color:#fff;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
-        .rs-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(0,255,120,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,120,0.02) 1px,transparent 1px);background-size:44px 44px}
-        .rs-vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 25%,rgba(0,0,0,0.9) 100%)}
-        .rs-noise{position:fixed;inset:0;z-index:2;opacity:0.02;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:120px 120px;animation:rs-noise 0.4s steps(1) infinite}
-        .rs-glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:800px;border-radius:50%;z-index:1;pointer-events:none}
-
-        .rs-main{position:relative;z-index:10;flex:1;display:flex;flex-direction:column;gap:16px;padding:20px 16px 36px;width:100%;max-width:1300px;margin:0 auto;}
-        @media(min-width:900px){.rs-main{padding:36px 40px 36px}}
-
-        /* VERDICT */
-        .rs-verdict-card{border:1px solid;padding:20px 18px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;position:relative;overflow:hidden;}
-        @media(min-width:560px){.rs-verdict-card{flex-direction:row;align-items:center;gap:20px}}
-        .rs-verdict-icon-wrap{position:relative;flex-shrink:0}
-        .rs-verdict-icon{font-size:36px;line-height:1;display:block;position:relative;z-index:1}
-        .rs-glitch-r,.rs-glitch-b{position:absolute;top:0;left:0;font-size:36px;pointer-events:none;user-select:none}
-        .rs-glitch-r{transform:translate(2px,-1px);clip-path:inset(25% 0 40% 0)}
-        .rs-glitch-b{transform:translate(-2px,1px);clip-path:inset(60% 0 10% 0)}
-        .rs-verdict-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:1;min-width:0;flex-wrap:wrap}
-        .rs-verdict-label{font-family:'Orbitron',sans-serif;font-size:clamp(14px,3.5vw,20px);font-weight:900;letter-spacing:2px;margin-bottom:6px}
-        .rs-verdict-sub{font-family:'Rajdhani',sans-serif;font-size:clamp(12px,2vw,13px);color:rgba(255,255,255,0.38);line-height:1.65;max-width:380px;margin-bottom:8px}
-        .rs-defect-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-        .rs-defect-badge{font-size:8px;letter-spacing:1.5px;border:1px solid;padding:2px 8px;text-transform:uppercase}
-        .rs-ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
-        .rs-ring-inner{position:absolute;display:flex;flex-direction:column;align-items:center;gap:1px}
-        .rs-ring-val{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;line-height:1}
-        .rs-ring-lbl{font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.25)}
-
-        /* 2-COL */
-        .rs-cols{display:flex;flex-direction:column;gap:20px}
-        @media(min-width:900px){.rs-cols{flex-direction:row;gap:0}.rs-left{flex:0 0 360px;padding-right:40px;border-right:1px solid rgba(255,255,255,0.06)}.rs-right{flex:1;padding-left:40px}}
-
-        /* LEFT */
-        .rs-left{display:flex;flex-direction:column;gap:16px}
-        .rs-section-tag{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.2);margin-bottom:8px}
-        .rs-tag-dot{width:5px;height:5px;border-radius:50%;display:inline-block;animation:rs-blink 1.5s ease-in-out infinite}
-        .rs-meta{border:1px solid rgba(255,255,255,0.07);background:rgba(0,0,0,0.35);overflow:hidden}
-        .rs-meta-row{display:flex;justify-content:space-between;align-items:center;padding:7px 13px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:10px;gap:8px}
-        .rs-meta-key{color:rgba(255,255,255,0.2);letter-spacing:1.5px;white-space:nowrap}
-        .rs-meta-val{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;font-size:10px}
-
-        /* Image panel */
-        .rs-img-panel{display:flex;flex-direction:column;gap:8px}
-        .rs-img-tabs{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-        .rs-tab{background:none;border:1px solid;padding:4px 10px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1.5px;transition:all 0.2s;-webkit-tap-highlight-color:transparent}
-        .rs-img-box{border:1px solid;background:rgba(0,0,0,0.6);overflow:hidden;position:relative;min-height:100px}
-        .rs-bbox-canvas{width:100%;height:auto;display:block}
-        .rs-original-img{width:100%;height:auto;display:block;filter:brightness(0.9) contrast(1.05)}
-        .rs-img-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7)}
-        .rs-legend{display:flex;flex-wrap:wrap;gap:8px;padding:8px 0}
-        .rs-legend-item{display:flex;align-items:center;gap:5px}
-        .rs-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-        .rs-legend-txt{font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.45)}
-
-        .rs-actions{display:flex;gap:10px;flex-wrap:wrap}
-        .rs-btn-primary{flex:1;min-width:130px;font-family:'Orbitron',sans-serif;font-size:clamp(8px,2vw,10px);font-weight:700;letter-spacing:1.5px;background:transparent;border:1px solid;padding:14px 12px;cursor:pointer;transition:all 0.3s ease;clip-path:polygon(7px 0%,100% 0%,calc(100% - 7px) 100%,0% 100%);-webkit-tap-highlight-color:transparent;}
-        .rs-btn-secondary{font-family:'Orbitron',sans-serif;font-size:clamp(8px,2vw,10px);font-weight:700;letter-spacing:1.5px;background:transparent;border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.35);padding:14px 18px;cursor:pointer;transition:all 0.3s ease;-webkit-tap-highlight-color:transparent;}
-        .rs-btn-secondary:hover{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.28)}
-
-        /* RIGHT */
-        .rs-right{display:flex;flex-direction:column;gap:16px;min-width:0}
-        .rs-analysis-top{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
-        .rs-radar{flex:0 0 auto;border:1px solid;padding:12px;display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(0,0,0,0.35);min-width:0;}
-        .rs-radar-label{font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.2);white-space:nowrap}
-        .rs-canvas{display:block;max-width:100%;height:auto}
-        .rs-radar-status{font-size:8px;letter-spacing:1.5px;display:flex;align-items:center;gap:5px;white-space:nowrap}
-        .rs-radar-dot{width:5px;height:5px;border-radius:50%;display:inline-block;animation:rs-blink 1.2s infinite}
-
-        .rs-bars{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0;min-width:200px}
-        .rs-bar-item{padding:12px 14px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.25)}
-        .rs-bar-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:6px;flex-wrap:wrap}
-        .rs-bar-left{display:flex;align-items:center;gap:7px;min-width:0}
-        .rs-bar-icon{font-size:11px;color:rgba(255,255,255,0.28);flex-shrink:0}
-        .rs-bar-name{font-size:10px;color:rgba(255,255,255,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .rs-bar-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-        .rs-bar-level{font-size:7px;letter-spacing:1.5px;border:1px solid;padding:2px 7px;white-space:nowrap}
-        .rs-bar-pct{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700}
-        .rs-track{height:4px;background:rgba(255,255,255,0.05);position:relative;overflow:hidden}
-        .rs-fill{height:100%;position:relative;border-radius:2px}
-        .rs-fill-head{position:absolute;right:-1px;top:-2px;width:3px;height:8px;border-radius:2px}
-
-        /* All clear */
-        .rs-allclear{border:1px solid;padding:36px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
-
-        /* Table */
-        .rs-table{border:1px solid rgba(255,255,255,0.07);overflow:hidden}
-        .rs-table-head{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:6px 12px;background:rgba(255,255,255,0.03);font-size:8px;letter-spacing:1.5px;color:rgba(255,255,255,0.2);gap:8px}
-        .rs-table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:8px 12px;border-top:1px solid rgba(255,255,255,0.04);gap:8px;font-size:9px;transition:background 0.2s}
-        .rs-table-row:hover{background:rgba(255,255,255,0.02)}
-
-        .rs-divider{display:flex;align-items:center}
-        .rs-div-line{flex:1;height:1px}
-        .rs-div-node{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-
-        .rs-rec{border:1px solid;padding:16px 18px}
-        .rs-rec-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-        .rs-rec-icon{font-size:13px}
-        .rs-rec-title{font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.26);flex:1}
-        .rs-rec-badge{font-size:7px;letter-spacing:2px;border:1px solid;padding:2px 8px;white-space:nowrap}
-        .rs-rec-text{font-family:'Rajdhani',sans-serif;font-weight:300;font-size:clamp(12px,2vw,13px);color:rgba(255,255,255,0.42);line-height:1.8}
-
-        .rs-bottom-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);overflow:hidden}
-        @media(max-width:400px){.rs-bottom-stats{grid-template-columns:repeat(2,1fr)}}
-        .rs-bstat{padding:11px 12px;background:rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:4px}
-        .rs-bstat-val{font-family:'Orbitron',sans-serif;font-size:clamp(8px,2vw,10px);color:rgba(255,255,255,0.6);letter-spacing:0.5px;word-break:break-word}
-        .rs-bstat-lbl{font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.18);text-transform:uppercase}
-      `}</style>
     </div>
   );
 }
