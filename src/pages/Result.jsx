@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import Navbar from "./Navbar";
+import Navbar from "../components/Navbar";
 
 export default function Result() {
   const location = useLocation();
@@ -208,7 +208,7 @@ export default function Result() {
       <div className="rs-noise" />
       <div className="rs-glow" style={{ background: `radial-gradient(circle,${isDefect ? "rgba(255,50,60,0.06)" : "rgba(0,255,120,0.05)"} 0%,transparent 70%)` }} />
 
-      <Navbar accent={accent} />
+      <Navbar />
 
       <main className="rs-main" style={{ opacity: revealed ? 1 : 0, transform: revealed ? "translateY(0)" : "translateY(16px)", transition: "all 0.9s cubic-bezier(0.4,0,0.2,1)" }}>
 

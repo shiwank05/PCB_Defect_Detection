@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
-import Navbar from "./Navbar";
+import Navbar from "../components/Navbar";
 
 const BOOT_LINES = [
   "> INITIALIZING PCB-INSPECT AI...",
@@ -176,7 +176,7 @@ export default function Home() {
 
       {ripples.map(r => <div key={r.id} className="hm-ripple" style={{ left: r.x, top: r.y }} />)}
 
-      <Navbar accent="#00ff78" />
+      <Navbar />
 
       {/* BOOT */}
       {phase === "boot" && (

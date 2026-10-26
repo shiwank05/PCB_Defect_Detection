@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
+import Navbar from "../components/Navbar";
 import { API_URL } from "../config";
 
 
@@ -116,7 +116,7 @@ export default function Detect() {
       <div className="dt-vignette" />
       <div className="dt-noise" />
 
-      <Navbar accent="#00ff78" />
+      <Navbar />
 
       <main className="dt-main" style={{ opacity: revealed ? 1 : 0, transform: revealed ? "translateY(0)" : "translateY(14px)", transition: "all 0.8s cubic-bezier(0.4,0,0.2,1)" }}>
 
