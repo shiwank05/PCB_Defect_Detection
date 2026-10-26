@@ -68,10 +68,38 @@ Rules applied everywhere:
 
 ## Page-by-page
 
-- **Home:** hero with one primary action, four key model stats, a three-step "how it works", and the six defect classes as cards.
+- **Home:** hero, an illustrative result card, three model stats, a three-step "how it works", a feature grid, the six defect classes and a footer.
 - **Login / Register:** one centered card; Google sign-in first, then email form; inline password-strength meter and mismatch error on Register.
 - **Detect:** two-column layout: upload card and progress on the left, tips and model info on the right.
 - **Result:** verdict card (green pass / red fail), annotated image with tabs and legend, per-class confidence bars, a detections table and a recommendation.
+
+## Polish pass
+
+The first redesign was clean but flat. This pass adds depth, hierarchy and feedback without changing the palette or going back to the old sci-fi look. Every addition is a token or a shared component, not per-page CSS.
+
+**Depth**
+- **Three shadow levels** (`shadow-card`, `shadow-raise`, `shadow-pop`), each made of two layered shadows, so elevation reads as soft and natural. Cards sit at the lowest level, hovered cards and form panels one up, popovers and the hero preview the highest.
+- **Softer borders** (`#E8EAEF`) so surfaces are separated by light and shadow rather than hard lines.
+- **A faint indigo wash** at the top of every page (a single radial gradient at 8% opacity) gives the background some life without being noticeable as a "gradient".
+
+**Hierarchy**
+- A `SectionHeading` (small indigo label, large title, muted subtitle) is used for every section, so headings and spacing are consistent.
+- **Icons in tinted squares** (`IconBadge`) mark features, steps and stats. Icons are a small inline SVG set in `ui.jsx`, so there is no extra dependency. A teal secondary accent is used only for a few highlights.
+- The home page hero highlights one key phrase in the accent color, followed by a mock result card, built with plain HTML/CSS and clearly labeled "Illustrative example", so it makes no accuracy claims.
+- Result page: a verdict banner (green or red tint), three summary cards (total defects, most frequent type, average confidence, all derived from the response), and a defect list with severity badges and confidence bars.
+
+**Feedback and motion**
+- Cards and buttons lift 1-2 px with a shadow change on hover (150-200 ms). Page content fades and slides up once on load. Both use `motion-safe` / a reduced-motion rule, so they switch off for users who prefer less motion.
+- One `Alert` component (icon + tinted message) is used for errors and warnings on every page, replacing ad-hoc messages.
+- The upload area has hover and drag-active tints, shows a thumbnail, file name and size after selection, and the analyzing state has a spinner, a status text, a step list and skeleton placeholders.
+- Empty and error states (no scan data, no defects, image could not render) use the same `EmptyState` / `Alert` pieces.
+
+**Small details**
+- The navbar is the only translucent surface (white at ~80% with a slight blur), so it stays readable while scrolling. Cards are never translucent.
+- Auth pages use a split layout: a solid indigo brand panel with three benefits on desktop (hidden on mobile) and the form on the other side.
+- Indigo text selection, thin quiet scrollbars, and focus rings that now include a soft halo on inputs.
+
+**What was deliberately left out:** glows, strong gradients, particles, glassmorphism on cards, parallax, 3D effects, monospace fonts, and any invented number or testimonial. The only figures on the site (93.6% mAP@0.5, 693 training images, 6 classes) come from the project README; an unverified inference-speed figure was removed.
 
 ## Why a bar list instead of a radar chart
 
