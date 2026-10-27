@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Logo from "../components/Logo";
+import { useAuth } from "../context/AuthContext";
 import {
   Badge, Button, Card, Container, Icon, IconBadge, SectionHeading, StatCard,
 } from "../components/ui";
@@ -106,6 +107,8 @@ function PreviewCard() {
 
 export default function Home() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const firstName = user?.name?.split(" ")[0];
 
   return (
     <div className="min-h-screen">
@@ -139,15 +142,19 @@ export default function Home() {
               style={{ animationDelay: "180ms" }}
             >
               <Button size="lg" onClick={() => navigate("/detect")}>
-                Start inspection
+                {user ? "Start detection" : "Start inspection"}
                 <Icon name="arrow-right" className="h-4 w-4" />
               </Button>
-              <Button size="lg" variant="secondary" to="/register">
-                Create an account
-              </Button>
+              {!user && (
+                <Button size="lg" variant="secondary" to="/register">
+                  Create an account
+                </Button>
+              )}
             </div>
             <p className="animate-enter mt-4 text-sm text-muted" style={{ animationDelay: "220ms" }}>
-              Sign in required to run a scan.
+              {user
+                ? `Welcome back${firstName ? `, ${firstName}` : ""}. Upload a board image to get started.`
+                : "Sign in required to run a scan."}
             </p>
           </Container>
 
@@ -247,8 +254,12 @@ export default function Home() {
           </div>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
             <Link to="/detect" className="hover:text-ink">Detect</Link>
-            <Link to="/login" className="hover:text-ink">Sign in</Link>
-            <Link to="/register" className="hover:text-ink">Create account</Link>
+            {!user && (
+              <>
+                <Link to="/login" className="hover:text-ink">Sign in</Link>
+                <Link to="/register" className="hover:text-ink">Create account</Link>
+              </>
+            )}
             <a
               href="https://github.com/shiwank05/PCB_Defect_Detection"
               target="_blank"
