@@ -17,7 +17,7 @@ export default function OAuthSuccess() {
 
     if (token && email) {
       login(token, { name, email });
-      navigate("/detect", { replace: true });
+      navigate("/", { replace: true });
     } else {
       navigate("/login?error=oauth_failed", { replace: true });
     }
