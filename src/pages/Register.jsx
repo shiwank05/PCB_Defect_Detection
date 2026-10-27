@@ -1,21 +1,20 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../config";
 import AuthLayout, { GoogleButton, OrDivider } from "../components/AuthLayout";
 import { Alert, Button, Field, Input } from "../components/ui";
+import { getRedirectTarget } from "../utils/redirect";
 
 export default function Register() {
   const { login, token } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = getRedirectTarget(location);
 
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (token) navigate("/detect", { replace: true });
-  }, [token]);
 
   function handleChange(e) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -37,7 +36,7 @@ export default function Register() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Registration failed"); return; }
       login(data.token, data.user);
-      navigate("/detect");
+      navigate(redirectTo, { replace: true });
     } catch {
       setError("Cannot reach server. Please try again.");
     } finally {
@@ -60,6 +59,9 @@ export default function Register() {
 
   const passwordMismatch = form.confirm && form.confirm !== form.password;
 
+  // Already signed in: skip the form
+  if (token) return <Navigate to={redirectTo} replace />;
+
   return (
     <AuthLayout
       title="Create your account"
@@ -67,7 +69,7 @@ export default function Register() {
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to="/login" state={location.state} className="font-medium text-primary hover:underline">
             Sign in
           </Link>
         </>
