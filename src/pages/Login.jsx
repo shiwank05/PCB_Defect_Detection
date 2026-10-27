@@ -1,23 +1,21 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_URL } from "../config";
 import AuthLayout, { GoogleButton, OrDivider } from "../components/AuthLayout";
 import { Alert, Button, Field, Input } from "../components/ui";
+import { getRedirectTarget } from "../utils/redirect";
 
 export default function Login() {
   const { login, token } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const redirectTo = getRedirectTarget(location);
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (token) navigate("/detect", { replace: true });
-  }, [token]);
 
   // OAuth error
   useEffect(() => {
@@ -44,7 +42,7 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Login failed"); return; }
       login(data.token, data.user);
-      navigate("/detect");
+      navigate(redirectTo, { replace: true });
     } catch {
       setError("Cannot reach server. Please try again.");
     } finally {
@@ -56,6 +54,9 @@ export default function Login() {
     window.location.href = `${API_URL}/auth/google`;
   }
 
+  // Already signed in: skip the form
+  if (token) return <Navigate to={redirectTo} replace />;
+
   return (
     <AuthLayout
       title="Sign in"
@@ -63,7 +64,7 @@ export default function Login() {
       footer={
         <>
           Don&apos;t have an account?{" "}
-          <Link to="/register" className="font-medium text-primary hover:underline">
+          <Link to="/register" state={location.state} className="font-medium text-primary hover:underline">
             Create one
           </Link>
         </>
