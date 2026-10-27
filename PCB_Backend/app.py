@@ -267,7 +267,11 @@ def google_callback():
         token_data = token_resp.json()
 
         if "error" in token_data:
-            print(f"[ERROR] Google token exchange: {token_data}")
+            print(
+                f"[ERROR] Google token exchange: status={token_resp.status_code} "
+                f"error={str(token_data.get('error'))[:100]!r} "
+                f"description={str(token_data.get('error_description'))[:200]!r}"
+            )
             return redirect(f"{CLIENT_URL}/login?error=oauth_failed")
 
         access_token = token_data["access_token"]
